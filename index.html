@@ -582,11 +582,20 @@ textarea.autogrow{overflow-y:hidden;resize:none}
 .cc-next{font-size:13px;color:var(--navy);background:var(--blue-l);border-radius:8px;padding:8px 10px;display:flex;gap:6px;align-items:flex-start;flex:1}
 .cc-next .ic{margin-top:2px}
 .ccard .btn{width:100%}
+#f_preview .pdh{display:flex;align-items:center;gap:8px;font-size:13px;color:var(--navy);margin-bottom:8px;width:100%}
+#f_preview .pdh .mut{font-size:12.5px}
+#f_preview .pdrow{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px;width:100%}
+@media(max-width:640px){#f_preview .pdrow{grid-template-columns:1fr}}
+#f_preview .pd.ed{display:flex;flex-direction:column;gap:5px;font-size:12.5px;color:var(--slate);min-width:0}
+#f_preview .pd.ed input{font-size:14px;font-weight:600;padding:7px 9px}
+#f_preview .pd.ed small{color:var(--mut);font-size:11.5px}
+#f_preview .pd.ed.chg{border-color:var(--amb);background:var(--amb-l)}
+#f_preview .pd.ed.chg span::after{content:'（已修改）';color:var(--amb);font-weight:600}
 /* 人員培育與職務追蹤（主管人員列表） */
 .mgr-intro{color:var(--slate);font-size:14.5px;line-height:1.75;max-width:880px}
 .mgr-intro p{margin:4px 0 0}
 details.plandoc{background:#fff;border:1px solid var(--line);border-radius:var(--r);box-shadow:var(--sh);margin-bottom:14px}
-details.plandoc>summary{list-style:none;cursor:pointer;padding:12px 18px;display:flex;align-items:center;gap:8px;font-size:14px;font-weight:600;color:var(--navy)}
+details.plandoc>summary{list-style:none;cursor:pointer;padding:12px 18px;display:flex;align-items:center;gap:8px;font-weight:600;color:var(--navy)}
 details.plandoc>summary::-webkit-details-marker{display:none}
 details.plandoc>summary .ic{color:var(--teal)}
 details.plandoc>summary .tg{margin-left:auto;font-size:12.5px;font-weight:500;color:var(--mut);display:flex;align-items:center;gap:4px}
@@ -595,16 +604,17 @@ details.plandoc[open]>summary .tg .ic{transform:rotate(180deg)}
 .pd-bd{padding:2px 18px 16px;display:grid;grid-template-columns:minmax(0,1.15fr) minmax(0,1fr);gap:28px;align-items:start;font-size:13px;line-height:1.5}
 @media(max-width:860px){.pd-bd{grid-template-columns:1fr;gap:16px}}
 .pd-lab{font-size:13px;font-weight:600;color:var(--navy);margin-bottom:8px;line-height:20px}
-.pd-tl{display:grid;grid-template-columns:150px 1fr;grid-template-rows:34px 34px;gap:8px 12px;align-items:center}
-.pd-tl .nm{font-size:13px;color:var(--ink);font-weight:600;white-space:nowrap;line-height:34px;display:flex;align-items:baseline;gap:6px}
-.pd-tl .nm span{font-size:13px;font-weight:400;color:var(--mut);margin-left:0}
-.pd-seg{display:grid;grid-template-columns:repeat(3,1fr);gap:3px;height:34px}
+.pd-tl{display:grid;grid-template-columns:auto 1fr;grid-auto-rows:30px;gap:6px 12px;align-items:center}
+.pd-seg.h span{background:#eef6f5;color:var(--teal2)}
+.pd-tl .nm{font-size:13px;color:var(--ink);font-weight:600;white-space:nowrap;line-height:30px}
+.pd-tl .nm span{font-weight:400;color:var(--mut);margin-left:6px}
+.pd-seg{display:grid;grid-template-columns:repeat(3,1fr);gap:3px;height:30px}
 .pd-seg span{background:var(--teal-l);color:var(--teal2);display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:600}
 .pd-seg span:first-child{border-radius:7px 0 0 7px}.pd-seg span:last-child{border-radius:0 7px 7px 0}
 .pd-seg.s span{background:var(--blue-l);color:var(--navy2)}
-.pd-flow{display:grid;grid-template-columns:minmax(max-content,1fr) auto minmax(max-content,1fr) auto minmax(max-content,1fr) auto minmax(max-content,1fr);align-items:stretch;height:76px;line-height:1.5}
+.pd-flow{display:grid;grid-template-columns:minmax(max-content,1fr) auto minmax(max-content,1fr) auto minmax(max-content,1fr) auto minmax(max-content,1fr);align-items:stretch;height:102px}
 .pd-flow .fs,.pd-flow .fs small{white-space:nowrap}
-.pd-flow .fs{border:1px solid var(--line);background:var(--soft);border-radius:7px;padding:0 10px;font-size:13px;gap:2px;color:var(--ink);font-weight:600;display:flex;flex-direction:column;justify-content:center;align-items:center;text-align:center;min-width:0}
+.pd-flow .fs{border:1px solid var(--line);background:var(--soft);border-radius:8px;padding:0 10px;font-size:13px;color:var(--ink);font-weight:600;display:flex;flex-direction:column;justify-content:center;align-items:center;text-align:center;min-width:0}
 .pd-flow .fs small{display:block;color:var(--mut);font-size:13px;font-weight:400}
 .pd-flow .fs.k{border-color:#c5e8e4;background:var(--teal-l);color:var(--teal2)}
 .pd-flow .ar{color:var(--line2);font-size:13px;display:flex;align-items:center;padding:0 5px}
@@ -612,14 +622,12 @@ details.plandoc[open]>summary .tg .ic{transform:rotate(180deg)}
 .pd-note{grid-column:1/-1;font-size:13px;color:var(--slate);display:flex;gap:6px;align-items:center;border-top:1px dashed var(--line);padding-top:10px}
 .pd-note .ic{color:var(--amb);flex:none}
 /* 主管端統計卡（精簡） */
-.stats.mini{gap:10px;margin-bottom:12px}
-.stats.mini .stat{padding:7px 12px;gap:10px;border-radius:9px;box-shadow:none}
-.stats.mini .si{width:28px;height:28px;border-radius:8px}
-.stats.mini .si svg{width:16px;height:16px}
-.stats.mini .stat>span:last-child{display:flex;align-items:baseline;gap:8px;min-width:0}
-.stats.mini .stat br{display:none}
-.stats.mini .sn{font-size:18px;line-height:1.2}
-.stats.mini .sl{font-size:13px;white-space:nowrap}
+.stats.mini{gap:12px;margin-bottom:12px}
+.stats.mini .stat{padding:10px 14px;gap:12px;border-radius:10px}
+.stats.mini .si{width:34px;height:34px;border-radius:9px}
+.stats.mini .si svg{width:18px;height:18px}
+.stats.mini .sn{font-size:20px}
+.stats.mini .sl{font-size:12.5px}
 .prows{display:flex;flex-direction:column;gap:10px}
 .prow{background:#fff;border:1px solid var(--line);border-radius:var(--r);box-shadow:var(--sh);padding:14px 18px;border-left:4px solid var(--line2)}
 .prow.act{border-left-color:var(--teal)}.prow.late{border-left-color:var(--red)}.prow.fin{border-left-color:var(--grn)}
@@ -960,6 +968,9 @@ function hintFor(dim, stageIdx){
   return DIM_HINT_DEFAULT;
 }
 const REQ = '<span class="req" title="必填">*</span>';
+/* 工作內容最少項數：一行一項（「1.」「・」等編號後要有文字才算），同 Code.gs contentCount */
+const MIN_CONTENT_ITEMS = 2;
+const contentCount = t => String(t||'').split('\n').map(l=>l.replace(/^\s*(\d+\s*[.、．)）]|[•・\-－*])\s*/,'').trim()).filter(Boolean).length;
 
 // 計畫版本與階段切分（m = 起訖月份偏移）
 const STAGE_SETS = {
@@ -967,11 +978,16 @@ const STAGE_SETS = {
     {label:'第一階段',range:'第1-3個月',name:'基礎適應期',m:[0,3]},
     {label:'第二階段',range:'第4-7個月',name:'作業實務期',m:[3,7]},
     {label:'第三階段',range:'第8-12個月',name:'整合發揮期',m:[7,12]}]},
+  '6m': {name:'半年度計畫（三階段）', stages:[
+    {label:'第一階段',range:'第1-2個月',name:'基礎適應期',m:[0,2]},
+    {label:'第二階段',range:'第3-4個月',name:'作業實務期',m:[2,4]},
+    {label:'第三階段',range:'第5-6個月',name:'整合發揮期',m:[4,6]}]},
   '3m': {name:'三個月計畫（特殊情況）', stages:[
     {label:'第一階段',range:'第1個月',name:'熟悉適應期',m:[0,1]},
     {label:'第二階段',range:'第2個月',name:'實務執行期',m:[1,2]},
     {label:'第三階段',range:'第3個月',name:'獨立作業期',m:[2,3]}]}
 };
+const VER_SHORT = {'12m':'全年度','6m':'半年度','3m':'三個月'}, VER_LEN = {'12m':'12 個月','6m':'6 個月','3m':'3 個月'};
 const STANDARD = [
   ['表現優異','明確或超前達成目標，能獨立規劃並落地執行，且主動提出改善建議。',['能清楚說明思路，且交付物可直接使用','交辦後基本不用追蹤即可完成','會主動發現問題並提出具體解法或改善提案']],
   ['表現尚可','能完成主要任務，但在穩定度或完整度上仍需加強，具備潛力需持續引導。',['任務可完成，但需要較多提醒或協助','文件或流程雛型可用，但尚未形成標準','對跨部門溝通有努力，但影響力仍可再提升']],
@@ -1012,6 +1028,27 @@ function copyText(txt){
 
 /* ---------------- 案件資料模型 ---------------- */
 function buildCase(f){
+  const c = buildCaseBase(f);
+  if(Array.isArray(f.dues)) applyDues(c, f.dues);
+  return c;
+}
+/* 自訂預計評核日期（同 Code.gs applyDues）：dues[i] 空白＝沿用預設（階段結束日）；只套用在尚未完成的階段。
+   規則：不可早於該階段開始日、最晚為階段結束日後 3 個月、各階段需依序（不可早於前一階段評核日） */
+function duesProblem(c, dues){
+  for(let i=0;i<c.stages.length;i++){ const s=c.stages[i], d=dues[i];
+    if(d===undefined||d===null||d===''||s.eval.locked) continue;
+    if(!isDateStr(d)) return s.label+'評核日期格式錯誤';
+    if(d<s.from) return s.label+'評核日期不可早於階段開始日 '+s.from;
+    const max=fmt(addM(parseD(s.to),3)); if(d>max) return s.label+'評核日期最晚為 '+max+'（階段結束日後 3 個月）'; }
+  const v=c.stages.map((s,i)=>(!s.eval.locked && dues[i]) ? dues[i] : s.due);
+  for(let i=1;i<v.length;i++) if(v[i]<v[i-1]) return c.stages[i].label+'評核日期不可早於'+c.stages[i-1].label+'評核日期（'+v[i-1]+'）';
+  return '';
+}
+function applyDues(c, dues){
+  const e=duesProblem(c,dues); if(e) throw new Error(e);
+  c.stages.forEach((s,i)=>{ if(!s.eval.locked && dues[i]) s.due=dues[i]; });
+}
+function buildCaseBase(f){
   const set = STAGE_SETS[f.version]; const st = parseD(f.startDate);
   const dims = f.dims.slice();
   return {
@@ -1109,7 +1146,7 @@ function outcomeLines(t){ return String(t||'').split(/\r?\n/).map(x=>x.trim().re
 /* 複製案件：沿用類型與版本，可選擇一併複製計畫內容（不含評核與簽名） */
 function copyCase(src, form, withPlan){
   normCase(src);
-  const c = buildCase({type:src.type, version:src.version, name:form.name, dept:form.dept, title:form.title, manager:form.manager, managerId:form.managerId, startDate:form.startDate, hireDate:form.hireDate, dims:[]});
+  const c = buildCase({type:src.type, version:src.version, name:form.name, dept:form.dept, title:form.title, manager:form.manager, managerId:form.managerId, startDate:form.startDate, hireDate:form.hireDate, dues:form.dues, dims:[]});
   if(withPlan) c.stages.forEach((s,i)=>{ const ss=src.stages[i]; s.goal=ss.goal; s.dims=ss.dims.slice();
     s.items=ss.dims.map((_,j)=>({content:(ss.items[j]||{}).content||'',outcome:(ss.items[j]||{}).outcome||''}));
     s.eval.ratings=s.dims.map(()=>''); s.eval.comments=s.dims.map(()=>''); s.eval.checks=s.dims.map(()=>[]); });
@@ -1196,6 +1233,7 @@ function stagePlanProblem(s){
   if(!s.goal.trim()) return s.label+'的「階段目標」尚未填寫';
   for(let j=0;j<s.dims.length;j++){
     if(!s.items[j].content.trim()) return s.label+'「'+s.dims[j]+'」的工作內容尚未填寫';
+    if(contentCount(s.items[j].content)<MIN_CONTENT_ITEMS) return s.label+'「'+s.dims[j]+'」的工作內容至少需要 '+MIN_CONTENT_ITEMS+' 項（一行一項，目前 '+contentCount(s.items[j].content)+' 項）';
     if(!s.items[j].outcome.trim()) return s.label+'「'+s.dims[j]+'」的預期成果尚未填寫';
   }
   return '';
@@ -1342,6 +1380,7 @@ function demoRoute(db, action, p){
     case 'adminDelete': delete db.cases[p.id]; return save(true);
     case 'adminUnlock': { const x=need(p.id); unlockPart(x.c,x.sigs,p.part); return save(true); }
     case 'adminUpdate': { const x=need(p.id); ['name','dept','title'].forEach(k=>{ if(p.fields[k]!==undefined) x.c[k]=p.fields[k]; });
+      if(Array.isArray(p.fields.dues)){ normCase(x.c); applyDues(x.c,p.fields.dues); }
       if(p.fields.hireDate!==undefined && x.c.type!=='新進'){ if(p.fields.hireDate && !isDateStr(p.fields.hireDate)) throw new Error('到職日格式錯誤'); x.c.hireDate=p.fields.hireDate; }
       if(p.fields.managerId!==undefined && p.fields.managerId!==x.c.managerId) demoReassign(db,[p.id],p.fields.managerId); return save(x.c); }
     case 'adminReassign': return save(demoReassign(db,p.ids,p.managerId));
@@ -1730,7 +1769,7 @@ var Admin; Admin = {
         : `<span class="chip r">${ic('user',12)}未指派</span>`;
       return `<tr data-id="${c.id}">
         <td data-label="受評人員"><div class="who"><div><b>${esc(c.name)}</b><span class="mut">${esc(c.dept)||'—'}｜${esc(c.title)||'—'}</span></div></div></td>
-        <td data-label="類型">${typeTag(c.type)}${c.version==='3m'?'<div class="mut">三個月版</div>':''}</td>
+        <td data-label="類型">${typeTag(c.type)}${c.version!=='12m'?`<div class="mut">${VER_SHORT[c.version]||''}版</div>`:''}</td>
         <td data-label="負責主管">${mcell}</td>
         <td data-label="生效日" style="white-space:nowrap">${c.startDate}</td>
         <td data-label="進度"><div style="min-width:0;flex:1"><div class="segs">${this.segs(c)}</div><div class="mut">${esc(o.next)}</div>${this.pbar(c)}</div></td>
@@ -2090,7 +2129,7 @@ var Admin; Admin = {
   tplHTML(){
     const L=this.list.filter(c=>unionDims(c).length).sort((a,b)=>(a.title||'').localeCompare(b.title||'','zh-Hant')||a.name.localeCompare(b.name,'zh-Hant'));
     return `<label class="f" style="margin-bottom:14px"><span>${ic('dup',14)} 套用既有案件為範本 <em>選填，適合同職務的新人或接替人員</em></span>
-      <select id="f_tpl"><option value="">不套用，由主管自行填寫計畫內容</option>${L.map(c=>`<option value="${c.id}">${esc(c.title||'（未填職稱）')}｜${esc(c.name)}｜${c.type}・${c.version==='3m'?'三個月版':'全年度'}</option>`).join('')}</select>
+      <select id="f_tpl"><option value="">不套用，由主管自行填寫計畫內容</option>${L.map(c=>`<option value="${c.id}">${esc(c.title||'（未填職稱）')}｜${esc(c.name)}｜${c.type}・${VER_SHORT[c.version]||'全年度'}</option>`).join('')}</select>
       <span class="mut" id="f_tplnote">${L.length?'':'目前沒有已填寫計畫內容的案件可套用'}</span></label>`;
   },
   bindTpl(){
@@ -2107,7 +2146,7 @@ var Admin; Admin = {
   formHTML(v={},lockType){
     return `<div class="grid">
       <label class="f">計畫類別<select id="f_type" ${lockType?'disabled':''}>${TYPES.map(t=>`<option ${v.type===t?'selected':''}>${t}</option>`).join('')}</select></label>
-      <label class="f">計畫版本<select id="f_ver" ${lockType?'disabled':''}><option value="12m" ${v.version==='3m'?'':'selected'}>全年度（1-3／4-7／8-12個月）</option><option value="3m" ${v.version==='3m'?'selected':''}>三個月（特殊情況，每月一階段）</option></select></label>
+      <label class="f">計畫版本<select id="f_ver" ${lockType?'disabled':''}><option value="12m" ${v.version==='3m'||v.version==='6m'?'':'selected'}>全年度（1-3／4-7／8-12個月）</option><option value="6m" ${v.version==='6m'?'selected':''}>半年度（1-2／3-4／5-6個月）</option><option value="3m" ${v.version==='3m'?'selected':''}>三個月（特殊情況，每月一階段）</option></select></label>
       <label class="f"><span>受評人員姓名${REQ}</span><input id="f_name" value="${esc(v.name||'')}"></label>
       <label class="f">部門<input id="f_dept" value="${esc(v.dept||'')}"></label>
       <label class="f">職稱（新職務）<input id="f_title" value="${esc(v.title||'')}"></label>
@@ -2121,8 +2160,11 @@ var Admin; Admin = {
     const syncType=()=>{ const t=$('#f_type').value, nw=t==='新進'; $('#f_effw').style.display=nw?'none':''; $('#f_effl').textContent=effLabel(t); };
     const preview=()=>{ syncType(); const v=$('#f_ver').value, d=$('#f_type').value==='新進' ? $('#f_hire').value : $('#f_date').value;
       if(!d){ $('#f_preview').innerHTML=`<span class="mut">${ic('info')} 填入${$('#f_type').value==='新進'?'到職日':effLabel($('#f_type').value)}後，系統會自動計算三個階段的評核日期。</span>`; return; }
-      const c=buildCase({type:'',version:v,name:'',dept:'',title:'',manager:'',startDate:d,dims:[]});
-      $('#f_preview').innerHTML=c.stages.map(s=>`<span class="pd">${s.label}評核<br><b>${s.due}</b></span>`).join(''); };
+      const c=buildCaseBase({type:'',version:v,name:'',dept:'',title:'',manager:'',startDate:d,dims:[]});
+      $('#f_preview').innerHTML=`<div class="pdh">${ic('calendar',14)}<b>預計評核日期</b><span class="mut">預設為各階段結束日，可直接修改</span></div>
+        <div class="pdrow">${c.stages.map((s,i)=>`<label class="pd ed"><span>${s.label}評核</span><input type="date" class="f_due" data-i="${i}" data-def="${s.due}" value="${s.due}" min="${s.from}">
+        <small>期間 ${s.from} ～ ${s.to}</small></label>`).join('')}</div>`;
+      document.querySelectorAll('.f_due').forEach(x=>x.oninput=x.onchange=()=>x.closest('.pd').classList.toggle('chg',x.value!==x.dataset.def)); };
     $('#f_ver').onchange=preview; $('#f_date').onchange=preview; $('#f_hire').onchange=preview; $('#f_type').addEventListener('change',preview); preview();
     this.bindPicker();
   },
@@ -2130,9 +2172,13 @@ var Admin; Admin = {
     const form={type:$('#f_type').value,version:$('#f_ver').value,name:$('#f_name').value.trim(),dept:$('#f_dept').value.trim(),
       title:$('#f_title').value.trim(),hireDate:$('#f_hire').value,startDate:$('#f_date').value,dims:[]};
     if(form.type==='新進') form.startDate=form.hireDate;   // 新進：計畫自到職日起算
+    const dueEls=[...document.querySelectorAll('.f_due')];
+    if(dueEls.length){ form.dues=dueEls.map(x=>x.value===x.dataset.def?'':x.value);
+      if(dueEls.some(x=>!x.value)){ toast('預計評核日期不可空白'); return null; } }
     const miss=[['name','受評人員姓名'],['hireDate','到職日'],['startDate',effLabel(form.type)]].filter(([k])=>!form[k]).map(x=>x[1]);
     if(miss.length){ toast('請填寫：'+[...new Set(miss)].join('、')); return null; }
     if(form.type!=='新進' && form.startDate<form.hireDate){ toast(effLabel(form.type)+'不可早於到職日'); return null; }
+    if(form.dues){ const e=duesProblem(buildCaseBase(Object.assign({},form,{manager:''})),form.dues); if(e){ toast(e,3600); return null; } }
     const pk=this.readPicker(); if(!pk) return null;
     return Object.assign(form,pk);
   },
@@ -2177,12 +2223,20 @@ var Admin; Admin = {
         <label class="f">職稱（新職務）<input id="e_title" value="${esc(c.title)}"></label>
         ${c.type==='新進'?`<label class="f">到職日<input value="${esc(hireOf(c))}" disabled></label>`:`<label class="f">到職日<input type="date" id="e_hire" value="${esc(c.hireDate)}"></label><label class="f">${effLabel(c.type)}<input value="${esc(c.startDate)}" disabled></label>`}
       </div>
+      <div id="f_preview" class="preview-dates"><div class="pdh">${ic('calendar',14)}<b>預計評核日期</b><span class="mut">已完成的階段不可修改；最晚為階段結束日後 3 個月</span></div>
+        <div class="pdrow">${c.stages.map((s,i)=>`<label class="pd ed"><span>${s.label}評核</span>${s.eval.locked?`<input value="已完成 ${esc(s.eval.lockedAt)}" disabled>`:`<input type="date" class="e_due" data-i="${i}" data-def="${s.due}" value="${s.due}" min="${s.from}">`}
+          <small>期間 ${s.from} ～ ${s.to}</small></label>`).join('')}</div></div>
       ${this.pickerHTML(c.managerId)}
       <div class="tip" style="margin-top:14px">${ic('info')}<span>計畫類別、計畫版本與生效日（新進為到職日）建立後不可修改（會影響階段日期）；如需更改請用「複製案件」重建後再刪除原案件。</span></div>
       <div class="dlg-ft"><button class="btn o" data-close>取消</button><button class="btn" id="ego">${ic('save')}儲存</button></div>`,{wide:true});
     this.bindPicker(c.managerId);
+    document.querySelectorAll('.e_due').forEach(x=>x.oninput=x.onchange=()=>x.closest('.pd').classList.toggle('chg',x.value!==x.dataset.def));
     $('#ego').onclick=async()=>{ const fields={name:$('#e_name').value.trim(),dept:$('#e_dept').value.trim(),title:$('#e_title').value.trim()};
       if(!fields.name) return toast('受評人員姓名不可空白');
+      const de=[...document.querySelectorAll('.e_due')];
+      if(de.some(x=>!x.value)) return toast('預計評核日期不可空白');
+      if(de.some(x=>x.value!==x.dataset.def)){ fields.dues=c.stages.map((_,i)=>{ const x=de.find(y=>Number(y.dataset.i)===i); return x&&x.value!==x.dataset.def?x.value:''; });
+        const e=duesProblem(c,fields.dues); if(e) return toast(e,3600); }
       if($('#e_hire')){ fields.hireDate=$('#e_hire').value; if(fields.hireDate && fields.hireDate>c.startDate) return toast('到職日不可晚於'+effLabel(c.type)); }
       const pk=this.readPicker(); if(!pk) return;
       if(pk.newMgr || pk.managerId!==c.managerId){
@@ -2321,7 +2375,7 @@ var MgrHome; MgrHome = {
   btn(c){ return this.todo(c).b; },
   period(c){
     const ext=c.stages.slice(BASE_STAGES).reduce((a,s)=>a+(s.ext?s.ext.months:0),0);
-    return {len:(c.version==='3m'?'3 個月':'12 個月')+(ext?`＋延長 ${ext} 個月`:''), rng:`${c.startDate} ～ ${c.stages[c.stages.length-1].to}`};
+    return {len:(VER_LEN[c.version]||'12 個月')+(ext?`＋延長 ${ext} 個月`:''), rng:`${c.startDate} ～ ${c.stages[c.stages.length-1].to}`};
   },
   planDocOpen(){ try{ return localStorage.getItem('jpt_plandoc')!=='0'; }catch(e){ return true; } },
   render(){
@@ -2339,6 +2393,7 @@ var MgrHome; MgrHome = {
         <div><div class="pd-lab">計畫執行方式</div>
           <div class="pd-tl">
             <span class="nm">一般情況<span>0～12 個月</span></span><div class="pd-seg"><span>第一階段</span><span>第二階段</span><span>第三階段</span></div>
+            <span class="nm">半年計畫<span>0～6 個月</span></span><div class="pd-seg h"><span>第一階段</span><span>第二階段</span><span>第三階段</span></div>
             <span class="nm">特殊情況<span>縮短為 3 個月</span></span><div class="pd-seg s"><span>第一階段</span><span>第二階段</span><span>第三階段</span></div>
           </div></div>
         <div><div class="pd-lab">每位人員的作業流程</div>
@@ -2400,7 +2455,7 @@ var Manager; Manager = {
   id:'', token:'', c:null, sigs:{}, dirtySigs:{}, tab:'plan', dirty:false,
   STEPS: ['第一階段計畫','第二階段計畫','第三階段計畫','面談紀錄與員工回饋','確認與簽核'],
   SIGN_STEP: 4,
-  STEP_MONTHS: { '12m':['0-3個月','4-7個月','8-12個月'], '3m':['1個月','2個月','3個月'] },
+  STEP_MONTHS: { '12m':['0-3個月','4-7個月','8-12個月'], '6m':['1-2個月','3-4個月','5-6個月'], '3m':['1個月','2個月','3個月'] },
   /* 階段計畫步驟標題顯示該人員實際的階段期間（依人資設定的生效日計算）；STEP_MONTHS 保留作為缺日期時的備用 */
   stepTitle(k){ const s=this.c.stages[k];
     if(k<BASE_STAGES && s && s.from && s.to) return this.STEPS[k]+`（${md(s.from)}～${md(s.to)}）`;
@@ -2648,6 +2703,7 @@ var Manager; Manager = {
       s.dims.forEach((d,j)=>{ if(!String(d).trim()) L.push({m:`${s.label}：第 ${j+1} 個工作面向尚未命名`,step:i,dim:j,dimset:1}); });
       s.dims.forEach((d,j)=>{ const it=s.items[j], nm=d||('面向'+(j+1));
         if(!it.content.trim()) L.push({m:`${s.label}｜${nm}：工作內容未填寫`,step:i,dim:j});
+        else if(contentCount(it.content)<MIN_CONTENT_ITEMS) L.push({m:`${s.label}｜${nm}：工作內容至少需要 ${MIN_CONTENT_ITEMS} 項（一行一項，目前 ${contentCount(it.content)} 項）`,step:i,dim:j});
         if(!it.outcome.trim()) L.push({m:`${s.label}｜${nm}：預期成果未填寫`,step:i,dim:j}); });
     });
     if(withSign || withIv) ivProblems(c.plan.interview).forEach(x=>L.push(Object.assign(x,{step:3})));
@@ -2703,7 +2759,7 @@ var Manager; Manager = {
           <span class="mut">${f+1}／${n}</span>
           <button class="btn r s" id="rmdim" title="刪除此階段的這個面向">${ic('trash')}刪除面向</button></div>
         <div class="two">
-          <div class="f fld work"><label class="lbl" for="ct${i}">${ic('layers')}工作內容${REQ} <em>具體要執行哪些工作（3～4 點）</em></label>
+          <div class="f fld work"><label class="lbl" for="ct${i}">${ic('layers')}工作內容${REQ} <em>具體要執行哪些工作（建議填寫3-4項，最少須填寫${MIN_CONTENT_ITEMS}項）</em></label>
             ${this.egs('content', hint[0], 'hintC')}
             <textarea id="ct${i}" rows="6" data-bind="stages.${i}.items.${f}.content" placeholder="可參考上方範例，寫出同仁實際的工作內容">${esc(s.items[f].content)}</textarea></div>
           <div class="f fld out"><label class="lbl" for="oc${i}">${ic('target')}預期成果${REQ} <em>完成後可檢核的成果或產出（逐點對應）</em></label>
@@ -2764,7 +2820,7 @@ var Manager; Manager = {
   isV2(i){ return NEW_DIM_UI_STAGES.includes(i); },
   /* 卡片完成判斷：面向名稱、工作內容、預期成果皆已填寫 */
   cardState(i,j){ const s=this.c.stages[i], it=s.items[j]||{content:'',outcome:''};
-    const n=!!String(s.dims[j]||'').trim(), a=!!it.content.trim(), b=!!it.outcome.trim(); return n&&a&&b?'done':(a||b?'prog':''); },
+    const n=!!String(s.dims[j]||'').trim(), a=!!it.content.trim(), b=!!it.outcome.trim(); return n&&a&&b&&contentCount(it.content)>=MIN_CONTENT_ITEMS?'done':(a||b?'prog':''); },
   /* 回到頁面時，依已選面向自動帶出最接近的職務性質 */
   guessCat(i){ const D=this.c.stages[i].dims.map(d=>String(d).trim()); let best='',bn=0;
     DIM_RECOMMEND.forEach(g=>{ const k=g.dims.filter(x=>D.includes(x.name)).length; if(k>bn){ bn=k; best=g.key; } }); return best; },
@@ -2808,7 +2864,7 @@ var Manager; Manager = {
         ${isOpen?`<div class="dc-bd">
           <div class="dc-namef"><label for="dimName">面向名稱${REQ}</label><input class="${nm?'':'bad'}" id="dimName" data-bind="stages.${i}.dims.${j}" value="${esc(d)}" placeholder="例如：專業技術與實務應用" maxlength="50" aria-label="面向名稱"></div>
           <div class="dc-pair">
-            <div class="f fld work"><label class="lbl" for="ct${i}">${ic('layers')}工作內容${REQ} <em>具體執行哪些工作（3～4 點）</em></label>
+            <div class="f fld work"><label class="lbl" for="ct${i}">${ic('layers')}工作內容${REQ} <em>具體執行哪些工作（建議填寫3-4項，最少須填寫${MIN_CONTENT_ITEMS}項）</em></label>
               ${this.egs('content', hint[0], 'hintC')}
               <textarea id="ct${i}" rows="6" data-bind="stages.${i}.items.${j}.content" placeholder="可參考上方範例，寫出同仁實際的工作內容">${esc(s.items[j].content)}</textarea></div>
             <div class="dc-arrow" aria-hidden="true">${ic('right',20)}</div>
@@ -3103,7 +3159,7 @@ var Manager; Manager = {
       ${ep.dims.map((d,j)=>`<div class="xrow" id="xrow${j}"><div class="xn"><span class="dno">${p2(j+1)}</span>
           <input data-bind="stages.${i}.eval.extPlan.dims.${j}" value="${esc(d)}" placeholder="工作面向名稱" maxlength="50" aria-label="工作面向名稱">
           <button type="button" class="iconbtn" data-xdel="${j}" title="刪除此面向" ${n<=1?'disabled':''}>${ic('trash',16)}</button></div>
-        <div class="dc-pair"><textarea class="autogrow" data-bind="stages.${i}.eval.extPlan.items.${j}.content" placeholder="工作內容（具體執行哪些工作）">${esc(ep.items[j].content)}</textarea>
+        <div class="dc-pair"><textarea class="autogrow" data-bind="stages.${i}.eval.extPlan.items.${j}.content" placeholder="工作內容（建議填寫3-4項，最少須填寫2項，一行一項）">${esc(ep.items[j].content)}</textarea>
           <div class="dc-arrow">${ic('right',18)}</div>
           <textarea class="autogrow" data-bind="stages.${i}.eval.extPlan.items.${j}.outcome" placeholder="預期成果（可檢核的成果）">${esc(ep.items[j].outcome)}</textarea></div></div>`).join('')}
       <div style="margin-top:10px" class="row"><button type="button" class="btn o s" id="xAdd" ${n>=MAX_DIMS?'disabled':''}>${ic('plus',14)}新增工作面向</button>
@@ -3150,6 +3206,7 @@ var Manager; Manager = {
       xp.dims.forEach((d,j)=>{ const nm=String(d).trim()||('第 '+(j+1)+' 個面向');
         if(!String(d).trim()) L.push({m:`延長期間：第 ${j+1} 個工作面向尚未命名`,anchor:'xrow'+j});
         if(!xp.items[j].content.trim()) L.push({m:`延長期間「${nm}」的工作內容未填寫`,anchor:'xrow'+j});
+        else if(contentCount(xp.items[j].content)<MIN_CONTENT_ITEMS) L.push({m:`延長期間「${nm}」的工作內容至少需要 ${MIN_CONTENT_ITEMS} 項（一行一項）`,anchor:'xrow'+j});
         if(!xp.items[j].outcome.trim()) L.push({m:`延長期間「${nm}」的預期成果未填寫`,anchor:'xrow'+j}); });
       if(!e.extAck) L.push({m:'受評人員尚未勾選確認延長觀察',anchor:'extBox'});
     }
