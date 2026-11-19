@@ -2069,8 +2069,13 @@ var Admin; Admin = {
     return plans;
   },
   /* 匯入視窗重繪時保留已填內容（取消確認或匯入失敗時不必重填） */
-  impSnap(){ return [...document.querySelectorAll('#modal input,#modal select')].map(el=>el.type==='file'||el.name==='impSel'?null:(el.type==='checkbox'?el.checked:el.value)); },
-  impRestore(v){ [...document.querySelectorAll('#modal input,#modal select')].forEach((el,k)=>{ if(v[k]==null) return; if(el.type==='checkbox') el.checked=v[k]; else el.value=v[k]; }); },
+  /* 匯入失敗或取消確認時保留已填內容：以欄位 id／class＋data-i 為鍵（評核日期欄會依日期重建，位置會變動，不能用順序對應） */
+  impKey(el){ return el.id || ((el.classList[0]||'')+':'+(el.dataset.i||'')+':'+(el.name||'')); },
+  impSnap(){ const o={}; document.querySelectorAll('#modal input,#modal select').forEach(el=>{ if(el.type==='file'||el.name==='impSel') return; o[this.impKey(el)]=el.type==='checkbox'?el.checked:el.value; }); return o; },
+  impRestore(v,onlyDue){ document.querySelectorAll('#modal input,#modal select').forEach(el=>{ const k=this.impKey(el);
+      if(!(k in v) || el.classList.contains('f_due')!==!!onlyDue) return;
+      if(el.type==='checkbox') el.checked=v[k]; else el.value=v[k];
+      if(onlyDue) el.closest('.pd').classList.toggle('chg',el.value!==el.dataset.def); }); },
   importDlg(keep){
     const P=this.imp ? this.imp.plans : null, done=p=>p.ref && this.list.some(c=>c.importRef===p.ref);
     if(P && (this.impSel>=P.length)) this.impSel=0;
@@ -2105,6 +2110,7 @@ var Admin; Admin = {
     if(!p) return;
     if(keep) this.impRestore(keep);
     this.bindPreview();
+    if(keep) this.impRestore(keep,true);
     const sync=()=>{ let prev=true; [0,1,2].forEach(i=>{ const cb=document.querySelector(`.impP[data-i="${i}"]`);
       cb.disabled=!prev; if(!prev) cb.checked=false; const on=cb.checked;
       document.querySelector(`.impD[data-i="${i}"]`).disabled=!on; document.querySelector(`.impC[data-i="${i}"]`).disabled=!on; prev=on; }); };
