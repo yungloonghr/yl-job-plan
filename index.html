@@ -759,7 +759,7 @@ const CONCLUSIONS = ['通過','延長觀察','不通過'];
 const TYPES = ['新進','晉升','調職','PIP改善'];
 /* 延長階段：主管在第三（或第四）階段評核選「延長觀察」並選擇延長 1～3 個月、受評人員勾選確認，
    評核表雙方簽名送出後，系統自動建立下一個延長階段；人資只需在期滿時開啟評核。最多到第五階段（Code.gs 有相同規則） */
-const BASE_STAGES = 3, MAX_STAGES = 5, CN = ['一','二','三','四','五'], EXT_MONTHS = [1,2,3];
+const BASE_STAGES = 3, MAX_STAGES = 5, CN = ['一','二','三','四','五','六','七'], EXT_MONTHS = [1,2,3];   // 六、七：5 階段評核案件的延長階段名稱
 const EXT_ACK = '受評人員已了解延長觀察的原因、延長期間，以及延長期間的改善重點與評核方式，並同意延長觀察。';
 /* 第 i 個階段選「延長觀察」時是否會建立延長階段：第三階段起、且為目前最後一個階段、尚未達第五階段 */
 const canExtendAt = (c,i) => i>=BASE_STAGES-1 && i===c.stages.length-1 && c.stages.length<MAX_STAGES;
@@ -779,8 +779,20 @@ const isExtPart = p => typeof p==='string' && p.charAt(0)==='x';
 const CADENCES = {
   std: {name:'標準 3 次',   months:'3、7、12',       rv:[[],[],[]]},
   hh5: {name:'獵頭 5 次',   months:'1、2、3、7、12', rv:[[1,2],[],[]]},
-  mgr5:{name:'管理職 5 次', months:'1、3、5、7、12', rv:[[1],[5],[]]}
+  mgr5:{name:'管理職 5 次', months:'1、3、5、7、12', rv:[[1],[5],[]]},
+  /* 5 階段評核（2026-11 新增）：月份同獵頭 5 次，但第 1、2 個月為「正式評核」：由人資開啟，結論為通過／延長觀察／不通過（不會建立延長階段）。
+     顯示名稱：第 1、2 個月＝第一、二階段評核；第 3、7、12 個月＝第三、四、五階段評核；這三次評核仍分別依職務計畫書第 1-3／4-7／8-12 個月的計畫內容 */
+  f5:  {name:'5 階段評核',    months:'1、2、3、7、12', rv:[[1,2],[],[]], formal:true}
 };
+/* 新增案件時可選的評核次數（舊案件的獵頭 5 次、管理職 5 次照常顯示，只是不再提供新增） */
+const NEW_CADS = [['std','3 階段評核'],['f5','5 階段評核']];
+const rvFormal = c => !!CADENCES[cadOf(c)].formal;                 // 此案件的階段中評核是否為正式評核
+const rvResults = c => rvFormal(c) ? CONCLUSIONS : RV_RESULTS;     // 結論選項
+const rvKind = c => rvFormal(c) ? '評核' : '追蹤評核';              // 顯示用名稱
+/* 職務計畫書裡的計畫段落名稱：5 階段評核案件以期間命名（第1-3個月計畫…），避免與「第一～五階段評核」混淆；其他案件沿用階段名稱 */
+const planLabel = (c,s) => rvFormal(c) && !s.ext ? s.range+'計畫' : s.label;
+const planHead = (c,s) => rvFormal(c) && !s.ext ? s.range+'計畫' : `${s.label}（${s.range}）`;
+const shortLabel = l => String(l).replace(/^第(.)階段$/,'$1');   // 第三階段 → 三（人資列表的小格）
 const RV_RESULTS = ['進度符合預期','需加強輔導'];
 const RV_GRACE = 14;   // 追蹤評核開放後超過幾天未完成視為逾期（僅提醒用）
 const cadOf = c => CADENCES[c && c.cadence] ? c.cadence : 'std';
@@ -789,13 +801,13 @@ const rvOf = (c,p) => c.stages[Number(p[1])].reviews[Number(p[2])];
 /* 追蹤評核是否輪到：計畫書已簽核、前一階段評核已完成、同階段前面的追蹤評核已完成 */
 const rvReady = (c,i,k) => { const s=c.stages[i]; return !!(s && s.reviews && s.reviews[k]) && c.plan.locked && (i===0 || c.stages[i-1].eval.locked) && s.reviews.slice(0,k).every(r=>r.eval.locked); };
 /* 追蹤評核可填寫：輪到了、尚未完成、且已到預計日期（自動開放，不需人資開啟） */
-const rvOpen = (c,i,k) => rvReady(c,i,k) && !c.stages[i].reviews[k].eval.locked && today()>=c.stages[i].reviews[k].due;
+const rvOpen = (c,i,k) => rvReady(c,i,k) && !c.stages[i].reviews[k].eval.locked && (rvFormal(c) ? c.stages[i].reviews[k].eval.open===true : today()>=c.stages[i].reviews[k].due);   // 5 次評核：須由人資開啟
 /* 依時間排序的評核清單：各階段的追蹤評核在前、階段評核在後 */
 const timeline = c => c.stages.flatMap((s,i)=>(s.reviews||[]).map((r,k)=>({rv:true,i,k,r,s,p:'r'+i+k})).concat([{rv:false,i,s,p:i}]));
 const itemDone = x => x.rv ? x.r.eval.locked : x.s.eval.locked;
 const nextItem = c => c.plan.locked ? (timeline(c).find(x=>!itemDone(x)) || null) : null;
 const rvEvalDefault = n => ({ratings:Array(n).fill(''), comments:Array(n).fill(''), result:'', note:'', feedback:'', date:'', locked:false, lockedAt:'', mgrName:'', paper:false});
-const newReview = (st,m,n) => { const to=fmt(addD(addM(st,m),-1)); return {month:m, label:'第'+m+'月追蹤', to, due:to, eval:rvEvalDefault(n)}; };
+const newReview = (st,m,n,label) => { const to=fmt(addD(addM(st,m),-1)); return {month:m, label:label||'第'+m+'月追蹤', to, due:to, eval:Object.assign(rvEvalDefault(n),{open:false})}; };
 /* 階段評核是否可進行：計畫書已簽核、前一階段已完成、延長階段須先簽核延長計畫、該階段的追蹤評核皆已完成 */
 const evalReady = (c,i) => { const s=c.stages[i]; return !!s && c.plan.locked && (i===0 || c.stages[i-1].eval.locked) && (!s.ext || s.ext.plan.locked) && (s.reviews||[]).every(r=>r.eval.locked); };
 const canExtend = c => { const n=c.stages.length, l=c.stages[n-1]; return n<MAX_STAGES && l.eval.locked && l.eval.conclusion==='延長觀察'; };
@@ -1093,7 +1105,8 @@ function applyDues(c, dues, rdues){
 function buildCaseBase(f){
   const set = STAGE_SETS[f.version]; const st = parseD(f.startDate);
   const dims = f.dims.slice();
-  const cad = f.version==='12m' && CADENCES[f.cadence] ? f.cadence : 'std';
+  const cad = f.version==='12m' && CADENCES[f.cadence] ? f.cadence : 'std', fm=!!CADENCES[cad].formal;
+  let no=0; const nm=()=>'第'+CN[no++]+'階段';   // 5 階段評核：依時間順序命名第一～五階段
   return {
     id: rid(10), token: rid(16), type:f.type, version:f.version, cadence:cad,
     name:f.name, dept:f.dept, title:f.title, manager:f.manager, managerId:f.managerId||'', startDate:f.startDate, hireDate:f.hireDate||(f.type==='新進'?f.startDate:''),
@@ -1102,8 +1115,9 @@ function buildCaseBase(f){
     plan:{locked:false, lockedAt:'', signDate:'', mgrName:'', interview:ivDefault(), paper:false},
     stages: set.stages.map((s,i)=>{
       const from=addM(st,s.m[0]), to=addD(addM(st,s.m[1]),-1);
-      return {label:s.label, range:s.range, name:s.name, from:fmt(from), to:fmt(to), due:fmt(to), goal:'',
-        reviews: CADENCES[cad].rv[i].map(m=>newReview(st,m,dims.length)),
+      const rvs=CADENCES[cad].rv[i].map(m=>newReview(st,m,dims.length,fm?nm():''));
+      return {label:fm?nm():s.label, range:s.range, name:s.name, from:fmt(from), to:fmt(to), due:fmt(to), goal:'',
+        reviews: rvs,
         dims:dims.slice(), items:dims.map(()=>({content:'',outcome:''})),
         eval:{ratings:dims.map(()=>''), comments:dims.map(()=>''), checks:dims.map(()=>[]), date:'', conclusion:'', note:'', feedback:'', locked:false, lockedAt:'', open:false, mgrName:'', paper:false}};
     })
@@ -1128,7 +1142,7 @@ function normCase(c){
     s.reviews.forEach(r=>{ const e=r.eval=Object.assign(rvEvalDefault(0), r.eval||{});
       e.ratings=(e.ratings||[]).slice(0,n); e.comments=(e.comments||[]).slice(0,n);
       for(let j=0;j<n;j++){ if(e.ratings[j]==null) e.ratings[j]=''; if(e.comments[j]==null) e.comments[j]=''; }
-      if(!RV_RESULTS.includes(e.result)) e.result=''; e.locked=e.locked===true; e.paper=e.paper===true; });
+      if(!rvResults(c).includes(e.result)) e.result=''; e.locked=e.locked===true; e.paper=e.paper===true; e.open=e.open===true; });   // open：5 次評核由人資開啟
     for(let j=0;j<n;j++){ if(!s.items[j]) s.items[j]={content:'',outcome:''}; }
     s.eval.ratings=(s.eval.ratings||[]).slice(0,n); s.eval.comments=(s.eval.comments||[]).slice(0,n);
     for(let j=0;j<n;j++){ if(s.eval.ratings[j]==null) s.eval.ratings[j]=''; if(s.eval.comments[j]==null) s.eval.comments[j]=''; }
@@ -1232,10 +1246,10 @@ const SIGKEYS = part => part==='plan' ? ['plan_mgr','plan_emp'] : (isExtPart(par
 const SIG_RE = /^(plan|s([0-4])|x([34])|(r[0-2][01]))_(mgr|emp)$/;
 const sigPart = m => m[1]==='plan' ? 'plan' : m[3] ? 'x'+m[3] : m[4] ? m[4] : Number(m[2]);
 /* 合併主管送來的追蹤評核內容（可填寫時才接受） */
-function takeReview(s, k, inc){
+function takeReview(c, s, k, inc){
   const r=s.reviews[k], ie=(inc && inc.eval) || {}, t=(x,n)=>String(x==null?'':x).slice(0,n);
   r.eval = Object.assign({}, r.eval, {ratings:s.dims.map((_,j)=>RATINGS.includes((ie.ratings||[])[j])?ie.ratings[j]:''), comments:s.dims.map((_,j)=>t((ie.comments||[])[j],2000)),
-    result:RV_RESULTS.includes(ie.result)?ie.result:'', note:t(ie.note,2000), feedback:t(ie.feedback,2000), locked:false, lockedAt:'', mgrName:'', paper:false});
+    result:rvResults(c).includes(ie.result)?ie.result:'', note:t(ie.note,2000), feedback:t(ie.feedback,2000), locked:false, lockedAt:'', mgrName:'', paper:false});
 }
 
 /* 共用的伺服器端合併規則（示範模式用；Code.gs 內有相同邏輯）
@@ -1265,7 +1279,7 @@ function mergeCase(old, inc, incSigs, oldSigs, lockPart){
   c.stages.forEach((s,i)=>{
     if(partOpen(i)){ const ie=inc.stages[i].eval; s.eval = Object.assign({}, ie, {ratings:s.dims.map((_,j)=>ie.ratings[j]||''), comments:s.dims.map((_,j)=>ie.comments[j]||''), checks:cleanChecks(ie.checks, s.dims.length), locked:false, lockedAt:'', open:true, mgrName:'', paper:false,
       extMonths:EXT_MONTHS.includes(Number(ie.extMonths))?Number(ie.extMonths):0, extAck:ie.extAck===true, extPlan:cleanExtPlan(ie.extPlan)}); }
-    s.reviews.forEach((_,k)=>{ if(partOpen('r'+i+k)) takeReview(s, k, ((inc.stages[i].reviews)||[])[k]); });
+    s.reviews.forEach((_,k)=>{ if(partOpen('r'+i+k)) takeReview(c, s, k, ((inc.stages[i].reviews)||[])[k]); });
   });
   const sigs = Object.assign({}, oldSigs);
   Object.keys(incSigs||{}).forEach(k=>{
@@ -1306,8 +1320,9 @@ function rvProblems(c, part){
   const s=c.stages[Number(part[1])], e=rvOf(c,part).eval, L=[];
   s.dims.forEach((d,j)=>{ if(!e.ratings[j]) L.push({m:`「${d}」尚未選擇評核結果`,anchor:'ev'+j}); });
   if(!String(e.feedback||'').trim()) L.push({m:'尚未填寫面談紀錄',anchor:'evFb'});
-  if(!e.result) L.push({m:'尚未選擇追蹤結果',anchor:'evConc'});
-  else if(e.result===RV_RESULTS[1] && !String(e.note||'').trim()) L.push({m:`追蹤結果為「${RV_RESULTS[1]}」時，請填寫說明與輔導安排`,anchor:'evConc'});
+  const R=rvResults(c), nm=rvFormal(c)?'評核結論':'追蹤結果';
+  if(!e.result) L.push({m:'尚未選擇'+nm,anchor:'evConc'});
+  else if(e.result!==R[0] && !String(e.note||'').trim()) L.push({m:`${nm}為「${e.result}」時，請填寫說明${rvFormal(c)?'':'與輔導安排'}`,anchor:'evConc'});
   return L;
 }
 function validatePart(c, sigs, part){
@@ -1317,7 +1332,7 @@ function validatePart(c, sigs, part){
     const s=c.stages[Number(part.slice(1))], e=stagePlanProblem(s); if(e) return e;
     if(!/^\d{4}-\d{2}-\d{2}$/.test(s.ext.plan.signDate||'')) return '請填寫延長計畫的簽署日期';
   } else if(part==='plan'){
-    for(const s of c.stages.slice(0,BASE_STAGES)){ const e=stagePlanProblem(s); if(e) return e; }
+    for(const s of c.stages.slice(0,BASE_STAGES)){ const e=stagePlanProblem(Object.assign({},s,{label:planLabel(c,s)})); if(e) return e; }
     const ivp=ivProblems(c.plan.interview); if(ivp.length) return ivp[0].m;
     if(!c.plan.signDate) return '請填寫簽署日期';
   } else {
@@ -1326,7 +1341,7 @@ function validatePart(c, sigs, part){
     if(!String(e.feedback||'').trim()) return '請填寫面談紀錄';
     if(!e.conclusion) return '請選擇階段結論';
     if(e.conclusion!=='通過' && !e.note.trim()) return '階段結論為「'+e.conclusion+'」時，請填寫說明';
-    if(e.conclusion==='延長觀察' && part>=MAX_STAGES-1) return '第五階段為最後的延長階段，結論請選擇「通過」或「不通過」';
+    if(e.conclusion==='延長觀察' && part>=MAX_STAGES-1) return c.stages[part].label+'為最後的延長階段，結論請選擇「通過」或「不通過」';
     if(e.conclusion==='延長觀察' && canExtendAt(c,part)){
       if(!EXT_MONTHS.includes(Number(e.extMonths))) return '請選擇延長觀察期間（1～3 個月）';
       if(!e.extAck) return '請勾選受評人員確認延長觀察';
@@ -1345,7 +1360,7 @@ function validatePart(c, sigs, part){
 const DEMO_SIG = 'data:image/svg+xml;utf8,'+encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" width="240" height="80"><path d="M20 55c15-30 30-35 38-10s16 15 26-12 20-8 26 14 20-20 34-6 28 12 50-8" fill="none" stroke="#111" stroke-width="3" stroke-linecap="round"/></svg>');
 const DemoDB = {
   KEY:'jpt_demo_v3', mem:null,   /* 示範模式預設為空白；開發測試時設定 window.DEMO_SEED=true 才會載入假資料 */
-  load(){ if(this.mem) return this.mem; try{ this.mem=JSON.parse(localStorage.getItem(this.KEY))||null; }catch(e){} if(!this.mem || !this.mem.managers){ this.mem={cases:{},managers:{},log:[]}; if(window.DEMO_SEED) this.seed(); else this.persist(); } return this.mem; },
+  load(){ if(this.mem) return this.mem; try{ this.mem=JSON.parse(localStorage.getItem(this.KEY))||null; }catch(e){} if(!this.mem || !this.mem.managers || (window.DEMO_SEED && !Object.keys(this.mem.cases||{}).length && !Object.keys(this.mem.managers).length)){ this.mem={cases:{},managers:{},log:[]}; if(window.DEMO_SEED) this.seed(); else this.persist(); } return this.mem; },
   persist(){ try{ localStorage.setItem(this.KEY, JSON.stringify(this.mem)); }catch(e){} },
   seed(){
     const db=this.mem;
@@ -1363,6 +1378,16 @@ const DemoDB = {
     normCase(c.c); c.c.dims=unionDims(c.c);
     add({type:'新進',version:'3m',name:'林小華（範例）',dept:'管理部',title:'行政助理',startDate:fmt(addD(new Date(),-5))},chang);
     const e=add({type:'晉升',name:'陳小美（範例）',dept:'廠務部',title:'廠務部經理',startDate:fmt(addD(new Date(),-40))},chang); fill(e,EXAMPLES[1]); lockPlan(e);
+    /* 評核次數範例（示範用）：完成某一次評核 */
+    const pass=(x,ev,key,d)=>{ const n=x.c.stages[0].dims.length; Object.assign(ev,{ratings:Array(n).fill('表現尚可'),comments:Array(n).fill(''),feedback:'已與受評人員面談，進度符合預期。',date:d,locked:true,lockedAt:d,mgrName:x.c.manager});
+      x.sigs[key+'_mgr']=DEMO_SIG; x.sigs[key+'_emp']=DEMO_SIG; };
+    const s3=addM(new Date(),-3); s3.setDate(s3.getDate()-5);
+    const t3=add({type:'新進',cadence:'std',name:'黃小強（3次評核範例）',dept:'工程部',title:'工程師',startDate:fmt(s3)},chen); fill(t3,EXAMPLES[2]); lockPlan(t3);
+    { const s=t3.c.stages[0]; s.eval.ratings=s.dims.map(()=>'表現尚可'); s.eval.comments=s.dims.map(()=>''); pass(t3,s.eval,'s0',fmt(addD(new Date(),-3))); Object.assign(s.eval,{open:true,conclusion:'通過',feedback:'第一階段面談完成。'});
+      t3.c.stages[1].due=fmt(addD(new Date(),10)); }   // 第二階段 10 天後到期 → 人資「該開啟評核了」
+    const s5=addM(new Date(),-2); s5.setDate(s5.getDate()-5);
+    const t5=add({type:'晉升',cadence:'f5',name:'吳小芳（5次評核範例）',dept:'業務部',title:'業務主任',startDate:fmt(s5)},chang); fill(t5,EXAMPLES[0]); lockPlan(t5);
+    { const s=t5.c.stages[0], r0=s.reviews[0]; Object.assign(r0.eval,{result:'通過',open:true}); pass(t5,r0.eval,'r00',r0.due); }   // 第1月評核已完成；第2月評核已到期、待人資開啟
     this.persist();
   }
 };
@@ -1482,6 +1507,14 @@ function demoRoute(db, action, p){
 }
 /* 人資開啟／關閉階段評核：計畫書須已簽核，且需依序開啟 */
 function openStage(c,part,open){
+  part=parsePart(part);
+  if(isRvPart(part)){   // 5 次評核的第 1、2 個月評核（正式評核）
+    const i=Number(part[1]), k=Number(part[2]), r=c.stages[i] && c.stages[i].reviews[k];
+    if(!r || !rvFormal(c)) throw new Error('此評核到日期自動開放，不需人資開啟');
+    if(r.eval.locked) throw new Error('此評核已完成，無法變更');
+    if(open){ if(!c.plan.locked) throw new Error('職務計畫書尚未簽核，無法開啟評核');
+      if(!rvReady(c,i,k)) throw new Error('請先完成前一次評核'); }
+    r.eval.open=!!open; return; }
   const s=c.stages[part]; if(!s) throw new Error('階段錯誤');
   if(s.eval.locked) throw new Error('此階段評核已完成，無法變更');
   if(open){
@@ -1519,7 +1552,7 @@ function demoShiftDue(db, ids, months){
 function addExtStage(c, i, months){
   const prev=c.stages[i], n=c.stages.length, ep=prev.eval.extPlan, [from,to]=extRange(prev,months);
   const last = ep && ep.dims && ep.dims.length ? {goal:ep.goal, dims:ep.dims, items:ep.items, eval:prev.eval} : prev;   // 有設定延長期間內容時以它為準
-  c.stages.push({label:'第'+CN[n]+'階段', range:'延長 '+months+' 個月', name:'延長觀察期', from, to, due:to, goal:last.goal, reviews:[],
+  c.stages.push({label:'第'+CN[rvFormal(c)?n+2:n]+'階段', range:'延長 '+months+' 個月', name:'延長觀察期', from, to, due:to, goal:last.goal, reviews:[],
     dims:last.dims.slice(), items:last.items.map(it=>({content:it.content,outcome:it.outcome})),
     eval:{ratings:last.dims.map(()=>''), comments:last.dims.map(()=>''), checks:last.dims.map(()=>[]), date:'', conclusion:'', note:'', feedback:'', locked:false, lockedAt:'', open:false, mgrName:'', paper:false, extMonths:0, extAck:false},
     ext:{months, auto:true, plan:{locked:true, lockedAt:last.eval.lockedAt||today(), signDate:last.eval.date||'', mgrName:c.manager}}});
@@ -1532,7 +1565,7 @@ function unlockPart(c,sigs,part){
     if(!r || !r.eval.locked) throw new Error('此追蹤評核尚未完成');
     if(s.eval.locked) throw new Error(s.label+'評核已完成，請先解鎖'+s.label+'評核');
     if(s.reviews.slice(k+1).some(x=>x.eval.locked)) throw new Error('後面的追蹤評核已完成，請先解鎖後面的追蹤評核');
-    Object.assign(r.eval,{locked:false,lockedAt:'',mgrName:'',paper:false});
+    Object.assign(r.eval,{locked:false,lockedAt:'',mgrName:'',paper:false,open:true});
   } else if(isExtPart(part)){
     const s=c.stages[Number(part.slice(1))];
     if(!s || !s.ext || !s.ext.plan.locked) throw new Error('此延長計畫尚未簽核');
@@ -1593,8 +1626,11 @@ function caseProgress(c){
 function rvStatus(c,i,k){
   const r=c.stages[i].reviews[k];
   if(r.eval.locked) return {t:'已完成 '+md(r.eval.lockedAt)+(r.eval.paper?'（紙本）':''),k:'g',done:true};
-  if(!rvReady(c,i,k)) return {t:'預計 '+md(r.due)+' 開放',k:''};
+  if(!rvReady(c,i,k)) return {t:'預計 '+md(r.due)+(rvFormal(c)?'':' 開放'),k:''};
   const d=daysBetween(today(),r.due);
+  if(rvFormal(c)){   // 正式評核：與階段評核相同，由人資開啟、過了預計日即逾期
+    const k2=d<0?'r':(d<=HR_LOOKAHEAD?'a':''), dt=d<0?`逾期 ${-d} 天`:d<=HR_LOOKAHEAD?`剩 ${d} 天`:'預計 '+md(r.due);
+    return r.eval.open ? {t:'評核中｜'+dt,k:k2||'p',open:true} : {t:'待人資開啟｜'+dt,k:k2}; }
   if(d>0) return {t:(d<=14?`${d} 天後開放`:'預計 '+md(r.due)+' 開放'),k:d<=14?'a':''};
   const late=-d>RV_GRACE; return {t:late?`逾期 ${-d-RV_GRACE} 天`:'填寫中｜開放 '+md(r.due),k:late?'r':'p',open:true};
 }
@@ -1604,6 +1640,29 @@ function signerName(c, part){
   if(isRvPart(part)){ const e=rvOf(c,part).eval; return e.locked ? (e.mgrName||c.manager) : c.manager; }
   if(isExtPart(part)){ const x=c.stages[Number(part.slice(1))].ext.plan; return x.locked ? (x.mgrName||c.manager) : c.manager; }
   const e=c.stages[part].eval; return e.locked ? (e.mgrName||c.manager) : c.manager;
+}
+/* ---------------- 現在輪到誰（主管端、人資端共用；階段 1 新增） ----------------
+   whoseTurn(c[, mgr]) → {who, reason}
+   who：hr 需要人資處理｜mgr 等待主管填寫｜none 等待中（不需任何人動作）｜done 已完成
+   純函式：只讀案件（與選填的主管物件），不存任何狀態；判斷重用 caseDone／nextItem／rvOpen／evalReady／canExtend。
+   mgr：人資端可傳入 Admin.mgrOf(c)。傳入 null＝主管清單找不到；主管連結已撤銷時也歸給人資（待確認）。主管端不需傳。 */
+const HR_LOOKAHEAD = 14;   // 預計評核日前幾天（含逾期）提醒人資開啟階段評核
+function whoseTurn(c, mgr){
+  if(!c.managerId || mgr===null) return {who:'hr', reason:'尚未指派主管'};
+  if(mgr && mgr.tokenStatus!=='active') return {who:'hr', reason:'主管連結已撤銷'};
+  if(canExtend(c)) return {who:'hr', reason:'可新增延長階段'};   // 舊資料用；須排在「已完成」之前，否則永遠判斷不到
+  if(caseDone(c)) return {who:'done', reason:'已完成簽核'};
+  if(!c.plan.locked) return {who:'mgr', reason:'計畫書填寫／面談／簽名中'};
+  const x=nextItem(c);
+  if(x.rv && rvFormal(c)){   // 5 次評核的第 1、2 個月：與階段評核相同規則
+    if(x.r.eval.open) return {who:'mgr', reason:'評核填寫中'};
+    return daysBetween(today(), x.r.due)<=HR_LOOKAHEAD ? {who:'hr', reason:'該開啟評核了'} : {who:'none', reason:'尚未到時間'}; }
+  if(x.rv) return rvOpen(c,x.i,x.k) ? {who:'mgr', reason:'追蹤評核填寫中'} : {who:'none', reason:'等待自動開放（人資不用動作）'};
+  const s=x.s;
+  if(s.ext && !s.ext.plan.locked) return {who:'mgr', reason:'主管訂定延長計畫中'};
+  if(s.eval.open) return {who:'mgr', reason:'階段評核填寫中'};
+  if(evalReady(c,x.i) && daysBetween(today(), s.due)<=HR_LOOKAHEAD) return {who:'hr', reason:'該開啟評核了'};
+  return {who:'none', reason:'尚未到時間'};
 }
 const baseUrl = () => location.href.split('?')[0].split('#')[0];
 const mgrUrl = m => m && m.token && m.tokenStatus==='active' ? baseUrl()+'?m='+m.token : '';
@@ -1766,9 +1825,12 @@ var Admin; Admin = {
     const i=c.stages.findIndex(s=>!s.eval.locked);
     if(i<0){ const l=c.stages[c.stages.length-1];
       if(canExtend(c)) return {t:'結論：延長觀察',k:'a',next:`${l.label}結論為延長觀察｜可新增延長階段`};
-      return {t:'已完成簽核',k:'g',next:`${c.stages.length>BASE_STAGES?'含延長，共 '+c.stages.length+' 個':'三'}階段評核皆已完成${l.eval.conclusion?'｜最終結論：'+l.eval.conclusion:''}`}; }
+      const tot=c.stages.length+(rvFormal(c)?2:0);
+      return {t:'已完成簽核',k:'g',next:`${c.stages.length>BASE_STAGES?'含延長，共 '+tot+' 個':rvFormal(c)?'五':'三'}階段評核皆已完成${l.eval.conclusion?'｜最終結論：'+l.eval.conclusion:''}`}; }
     const s=c.stages[i], rk=(s.reviews||[]).findIndex(r=>!r.eval.locked);
     if(rk>=0){ const r=s.reviews[rk], st=rvStatus(c,i,rk);
+      if(rvFormal(c)) return st.open ? {t:r.label+'評核中',k:st.k,next:`${r.label}評核｜${st.t}（主管填寫中）`}
+        : {t:r.label+'評核待開啟',k:st.k,next:`${r.label}評核｜預計評核日 ${r.due}｜${rvReady(c,i,rk)?'待人資開啟':'須先完成前一次評核'}`};
       return st.open ? {t:r.label+'評核中',k:st.k,next:`${s.label}｜${r.label}評核｜${st.t}（${r.due} 自動開放，主管填寫中）`}
         : {t:r.label+'待開放',k:st.k,next:`${s.label}｜${r.label}評核｜${r.due} 自動開放，人資不需操作`}; }
     if(s.ext && !s.ext.plan.locked) return {t:s.label+'延長計畫填寫中',k:'a',next:`主管訂定延長計畫中（延長 ${s.ext.months} 個月，${s.from} ～ ${s.to}）`};
@@ -1777,21 +1839,24 @@ var Admin; Admin = {
   },
   /* 下一個可由人資開啟／關閉的階段 */
   nextStage(c){ if(!c.plan.locked) return -1; return c.stages.findIndex(s=>!s.eval.locked); },
+  /* 下一個由人資開啟／關閉的評核：{p:表單代號, label, due, open, ready}；沒有則 null */
+  nextOpen(c){ const x=nextItem(c); if(!x) return null;
+    if(x.rv) return rvFormal(c) ? {p:x.p, label:x.r.label+'評核', due:x.r.due, open:x.r.eval.open, ready:rvReady(c,x.i,x.k)} : null;
+    return {p:x.i, label:x.s.label+'評核', due:x.s.due, open:x.s.eval.open, ready:evalReady(c,x.i)}; },
   segs(c){
     const seg=(t,k,tip)=>`<span class="sg ${k}" title="${esc(tip)}">${t}</span>`, ps=planStatus(c);
     return seg('計畫', c.plan.locked?'g':(ps.k||'b'), '職務計畫書：'+ps.t) +
-      c.stages.map((s,i)=>(s.reviews||[]).map((r,k)=>{ const st=rvStatus(c,i,k); return seg(r.month+'月', st.k, r.label+'（追蹤評核）：'+st.t); }).join('') +
+      c.stages.map((s,i)=>(s.reviews||[]).map((r,k)=>{ const st=rvStatus(c,i,k); return seg(rvFormal(c)?shortLabel(r.label):r.month+'月', st.k, r.label+'（'+rvKind(c)+'）：'+st.t); }).join('') +
         (()=>{ const st=stageStatus(c,i); const k = st.done?'g' : !s.eval.open ? (st.k==='r'?'r':'') : (st.k||'p');
-        return seg(CN[i]+(s.ext?'延':''), k, s.label+(s.ext?'（延長）':'')+'：'+(st.done?st.t:(s.eval.open?'評核中｜':'未開啟｜')+st.t)); })()).join('');
+        return seg(shortLabel(s.label)+(s.ext?'延':''), k, s.label+(s.ext?'（延長）':'')+'：'+(st.done?st.t:(s.eval.open?'評核中｜':'未開啟｜')+st.t)); })()).join('');
   },
   pbar(c){ const p=caseProgress(c); return `<div class="pbar"><div class="bar sm"><i style="width:${p}%"></i></div><b>${p}%</b></div>`; },
-  async openDlg(c,i,open){
-    const s=c.stages[i];
+  async openDlg(c,n,open){   // n＝nextOpen(c)
     const ok=await Dialog.confirm(open
-      ? {title:`開啟${s.label}評核`,icon:'flag',ok:'開啟評核',body:`開啟後，<b>${esc(c.manager)}</b> 可透過主管專屬連結填寫「${esc(c.name)}」的${s.label}評核。<br>預計評核日：<b>${s.due}</b>`}
-      : {title:`關閉${s.label}評核`,icon:'lock',danger:true,ok:'關閉評核',body:`關閉後主管將無法填寫${s.label}評核；已填寫但未送出的內容會保留，重新開啟後可繼續填寫。`});
+      ? {title:`開啟${n.label}`,icon:'flag',ok:'開啟評核',body:`開啟後，<b>${esc(c.manager)}</b> 可透過主管專屬連結填寫「${esc(c.name)}」的${n.label}。<br>預計評核日：<b>${n.due}</b>`}
+      : {title:`關閉${n.label}`,icon:'lock',danger:true,ok:'關閉評核',body:`關閉後主管將無法填寫${n.label}；已填寫但未送出的內容會保留，重新開啟後可繼續填寫。`});
     if(!ok) return;
-    try{ await api('adminOpenStage',{key:this.key,id:c.id,part:i,open}); toast(open?`已開啟${s.label}評核，請通知主管填寫`:`已關閉${s.label}評核`,3000); this.load(); }catch(e){ toast(e.message,3200); }
+    try{ await api('adminOpenStage',{key:this.key,id:c.id,part:n.p,open}); toast(open?`已開啟${n.label}，請通知主管填寫`:`已關閉${n.label}`,3000); this.load(); }catch(e){ toast(e.message,3200); }
   },
   /* ---------- 頁面框架與分頁 ---------- */
   setTab(t){ this.tab=t; try{ sessionStorage.setItem('jpt_tab',t); }catch(e){} this.render(); window.scrollTo(0,0); },
@@ -1869,7 +1934,7 @@ var Admin; Admin = {
     });
     $('#tb').innerHTML = L.length ? L.map(c=>{
       const o=this.overall(c), m=this.mgrOf(c);
-      const ns=this.nextStage(c), canOpen = ns>=0 && !c.stages[ns].eval.open && evalReady(c,ns);
+      const no=this.nextOpen(c), canOpen = !!no && !no.open && no.ready;
       const mcell = m ? `<div class="mgrcell"><b>${esc(m.name)}</b><span class="mut">${esc(m.empNo)}${m.tokenStatus==='active'?'':'｜<span style="color:var(--red)">連結已撤銷</span>'}</span></div>`
         : `<span class="chip r">${ic('user',12)}未指派</span>`;
       return `<tr data-id="${c.id}">
@@ -1880,7 +1945,7 @@ var Admin; Admin = {
         <td data-label="進度"><div style="min-width:0;flex:1"><div class="segs">${this.segs(c)}</div><div class="mut">${esc(o.next)}</div>${this.pbar(c)}</div></td>
         <td data-label="狀態"><span class="chip ${o.k}">${o.t}</span></td>
         <td><div class="acts">
-          ${canOpen?`<button class="btn t s" data-a="openStage" title="開啟${c.stages[ns].label}評核">${ic('flag')}開啟${CN[ns]}階評核</button>`:''}
+          ${canOpen?`<button class="btn t s" data-a="openStage" title="開啟${no.label}">${ic('flag')}開啟${no.label.replace(/^第(.)階段評核$/,'$1階評核')}</button>`:''}
           <button class="btn o s" data-a="view" title="查看案件內容">${ic('eye')}查看</button>
           <button class="btn o s" data-a="copy" title="複製負責主管的專屬連結">${ic('link')}主管連結</button>
           <button class="iconbtn" data-a="print" title="列印／存 PDF">${ic('printer',18)}</button>
@@ -1897,12 +1962,12 @@ var Admin; Admin = {
     if(a==='print') this.print(c);
     if(a==='edit') this.editDlg(c);
     if(a==='reassign') this.reassignDlg([c]);
-    const ns=this.nextStage(c);
-    if(a==='openStage') this.openDlg(c,ns,true);
+    const no=this.nextOpen(c);
+    if(a==='openStage' && no) this.openDlg(c,no,true);
     if(a==='more'){
-      const stageItem = ns<0 || !evalReady(c,ns) ? [] : c.stages[ns].eval.open
-        ? [{icon:'lock',label:`關閉${c.stages[ns].label}評核`,fn:()=>this.openDlg(c,ns,false)}]
-        : [{icon:'flag',label:`開啟${c.stages[ns].label}評核`,fn:()=>this.openDlg(c,ns,true)}];
+      const stageItem = !no || !no.ready ? [] : no.open
+        ? [{icon:'lock',label:`關閉${no.label}`,fn:()=>this.openDlg(c,no,false)}]
+        : [{icon:'flag',label:`開啟${no.label}`,fn:()=>this.openDlg(c,no,true)}];
 
       Menu.open(btn,[...stageItem,
         {icon:'external',label:'以主管身分開啟此案件',fn:()=>this.caseAction(c,'open')},
@@ -2262,7 +2327,7 @@ var Admin; Admin = {
     return `<div class="grid">
       <label class="f">計畫類別<select id="f_type" ${lockType?'disabled':''}>${TYPES.map(t=>`<option ${v.type===t?'selected':''}>${t}</option>`).join('')}</select></label>
       <label class="f">計畫版本<select id="f_ver" disabled><option value="12m">全年度（1-3／4-7／8-12個月）</option>${v.version==='6m'||v.version==='3m'?`<option value="${v.version}" data-old="1" selected>${VER_SHORT[v.version]}（舊版，沿用原案件）</option>`:''}</select></label>
-      <label class="f"><span>評核次數${REQ}</span><select id="f_cad">${Object.entries(CADENCES).map(([k,x])=>`<option value="${k}" ${(v.cadence||'std')===k?'selected':''}>${x.name}（第 ${x.months} 個月）</option>`).join('')}</select></label>
+      <label class="f"><span>評核次數${REQ}</span><select id="f_cad">${NEW_CADS.concat(v.cadence && !NEW_CADS.some(x=>x[0]===v.cadence) && CADENCES[v.cadence] ? [[v.cadence,CADENCES[v.cadence].name+'（舊設定，沿用原案件）']] : []).map(([k,nm])=>`<option value="${k}" ${(v.cadence||'std')===k?'selected':''}>${nm}（第 ${CADENCES[k].months} 個月）</option>`).join('')}</select></label>
       <label class="f"><span>受評人員姓名${REQ}</span><input id="f_name" value="${esc(v.name||'')}"></label>
       <label class="f">部門<input id="f_dept" value="${esc(v.dept||'')}"></label>
       <label class="f">職稱（新職務）<input id="f_title" value="${esc(v.title||'')}"></label>
@@ -2276,7 +2341,7 @@ var Admin; Admin = {
   dueGridHTML(c, pre){
     const fld=(cls,label,due,locked,min,attrs,rv)=>`<label class="dfl ${rv?'rv':''}"><span>${label}</span>${locked?`<input value="已完成 ${esc(locked)}" disabled>`:`<input type="date" class="${cls}" ${attrs} data-def="${due}" value="${due}" min="${min}">`}</label>`;
     return `<div class="pdrow">${c.stages.map((s,i)=>`<div class="pd ed"><div class="pdg">${s.label}${s.ext?'（延長）':''}<small>${s.from} ～ ${s.to}</small></div>
-      ${(s.reviews||[]).map((r,k)=>fld(pre+'_rdue',r.label,r.due,r.eval.locked?r.eval.lockedAt:'',s.from,`data-i="${i}" data-k="${k}"`,true)).join('')}
+      ${(s.reviews||[]).map((r,k)=>fld(pre+'_rdue',r.label+(rvFormal(c)?'評核':''),r.due,r.eval.locked?r.eval.lockedAt:'',s.from,`data-i="${i}" data-k="${k}"`,true)).join('')}
       ${fld(pre+'_due',s.label+'評核',s.due,s.eval.locked?s.eval.lockedAt:'',s.from,`data-i="${i}"`,false)}</div>`).join('')}</div>`;
   },
   bindDueGrid(){ document.querySelectorAll('#f_preview input[type=date]').forEach(x=>x.oninput=x.onchange=()=>x.closest('.dfl').classList.toggle('chg',x.value!==x.dataset.def)); },
@@ -2295,7 +2360,7 @@ var Admin; Admin = {
     const preview=()=>{ syncType(); const v=$('#f_ver').value, d=$('#f_type').value==='新進' ? $('#f_hire').value : $('#f_date').value;
       if(!d){ $('#f_preview').innerHTML=`<span class="mut">${ic('info')} 填入${$('#f_type').value==='新進'?'到職日':effLabel($('#f_type').value)}後，系統會依評核次數自動計算各次評核日期。</span>`; return; }
       const c=buildCaseBase({type:'',version:v,cadence:$('#f_cad').value,name:'',dept:'',title:'',manager:'',startDate:d,dims:[]}), n=timeline(c).length;
-      $('#f_preview').innerHTML=`<div class="pdh">${ic('calendar',14)}<b>預計評核日期</b><span class="mut">共 ${n} 次｜預設為各月／各階段的最後一天，可直接修改${n>3?'；追蹤評核到日期自動開放主管填寫':''}</span></div>
+      $('#f_preview').innerHTML=`<div class="pdh">${ic('calendar',14)}<b>預計評核日期</b><span class="mut">共 ${n} 次｜預設為各月／各階段的最後一天，可直接修改${n>3?(CADENCES[$('#f_cad').value].formal?'；每次評核都由人資開啟':'；追蹤評核到日期自動開放主管填寫'):''}</span></div>
         ${this.dueGridHTML(c,'f')}`;
       this.bindDueGrid(); };
     $('#f_ver').onchange=preview; $('#f_cad').onchange=preview; $('#f_date').onchange=preview; $('#f_hire').onchange=preview; $('#f_type').addEventListener('change',preview); preview();
@@ -2494,11 +2559,14 @@ var MgrHome; MgrHome = {
     return {k:'cur', ic:'pen', t:'待簽名', d:'面談紀錄已完成，待雙方簽名'};
   },
   stageCard(c,i){
-    const s=c.stages[i], rv=s.reviews||[], rvDone=rv.filter(r=>r.eval.locked).length, rvTx=rv.length?`追蹤評核 ${rvDone} / ${rv.length}｜`:'';
+    const fm=rvFormal(c), s=c.stages[i], rv=fm?[]:(s.reviews||[]), rvDone=rv.filter(r=>r.eval.locked).length, rvTx=rv.length?`追蹤評核 ${rvDone} / ${rv.length}｜`:'';
     if(s.eval.locked) return {k:'ok', ic:'checkc', t:'已完成', d:(rv.length?`含追蹤評核 ${rv.length} 次｜`:'')+'完成 '+md(s.eval.lockedAt)+(s.eval.paper?'（紙本）':'')};
     const nx=nextItem(c);
-    if(!nx || nx.i!==i) return {k:'idle', ic:'clock', t:'尚未開始', d:(rv.length?`含追蹤評核 ${rv.length} 次｜`:'')+'預計評核 '+md(s.due)};
+    if(!nx || nx.i!==i || (fm && nx.rv)) return {k:'idle', ic:'clock', t:'尚未開始', d:(rv.length?`含追蹤評核 ${rv.length} 次｜`:'')+'預計評核 '+md(s.due)};
     if(nx.rv){ const r=nx.r;
+      if(rvFormal(c)){ const d=daysBetween(today(),r.due);
+        return rvOpen(c,i,nx.k) ? {k:'cur'+(d<0?' late':''), ic:'flag', t:d<0?'已逾期':'待評核', d:`${r.label}評核｜期限 ${md(r.due)}${d<0?`｜逾期 ${-d} 天`:''}`}
+          : {k:'cur', ic:'clock', t:'進行中', d:`${r.label}評核 預計 ${md(r.due)}，待人資開啟`}; }
       if(rvOpen(c,i,nx.k)){ const late=daysBetween(r.due,today())>RV_GRACE; return {k:'cur'+(late?' late':''), ic:'flag', t:late?'已逾期':'待評核', d:`${r.label}｜${md(r.due)} 已開放`}; }
       return {k:'cur', ic:'clock', t:'進行中', d:`${rvTx}${r.label} ${md(r.due)} 開放`}; }
     if(s.ext && !s.ext.plan.locked) return {k:'cur', ic:'edit', t:'待訂延長計畫', d:`延長 ${s.ext.months} 個月｜${md(s.from)} 起`};
@@ -2507,12 +2575,23 @@ var MgrHome; MgrHome = {
     return {k:'cur', ic:'clock', t:'進行中', d:`${rvTx}預計評核 ${md(s.due)}，待人資開啟`};
   },
   /* ---- 目前待辦（tx）與操作按鈕（b）；kind：act 需處理｜late 已逾期｜idle 目前無待辦。按鈕一律開啟該人員的填寫頁，系統會自動帶到目前應處理的步驟 ---- */
+  /* 5 階段評核的第一、二階段（階段中的正式評核）進度卡片 */
+  rvCard(c,i,k){
+    const r=c.stages[i].reviews[k], nx=nextItem(c), d=daysBetween(today(),r.due);
+    if(r.eval.locked) return {k:'ok', ic:'checkc', t:'已完成', d:'完成 '+md(r.eval.lockedAt)+(r.eval.paper?'（紙本）':'')};
+    if(!nx || nx.p!=='r'+i+k) return {k:'idle', ic:'clock', t:'尚未開始', d:'預計評核 '+md(r.due)};
+    if(rvOpen(c,i,k)) return d<0 ? {k:'cur late', ic:'flag', t:'已逾期', d:`逾期 ${-d} 天（${md(r.due)}）`} : {k:'cur', ic:'flag', t:'待評核', d:`期限 ${md(r.due)}${d<=14?`｜剩 ${d} 天`:''}`};
+    return {k:'cur', ic:'clock', t:'進行中', d:`預計評核 ${md(r.due)}，待人資開啟`};
+  },
   todo(c){
     const st=caseState(c), i=c.stages.findIndex(s=>!s.eval.locked), s=c.stages[i], nx=nextItem(c);
     if(!c.plan.locked){ const P=this.planStep(c);
       if(P.k==='fill') return {kind:'act', lab:'目前待辦', tx:'請完成職務計畫書填寫。', b:['t','edit','進入職務計畫書']};
       if(P.k==='talk') return {kind:'act', lab:'目前待辦', tx:'請與員工進行職務計畫書面談，並完成面談紀錄與員工回饋。', b:['t','chat','進行面談確認']};
       return {kind:'act', lab:'目前待辦', tx:'請完成面談紀錄及雙方簽名，確認後送出職務計畫書。', b:['t','pen','完成面談簽名']}; }
+    if(nx && nx.rv && rvFormal(c)){ const r=nx.r, d=daysBetween(today(),r.due);
+      if(st==='eval') return {kind:d<0?'late':'act', lab:'目前待辦', tx:`請完成${r.label}評核面談，並完成雙方簽名（期限 ${r.due}${d<0?`，已逾期 ${-d} 天`:d<=14?`，剩 ${d} 天`:''}）。`, b:['t','flag',`進入${r.label}評核`]};
+      return {kind:'idle', lab:'目前無待辦', tx:`${r.label}評核預計於 ${r.due} 進行，屆時人資會通知您並開啟評核。`, b:['o','file','查看職務計畫']}; }
     if(nx && nx.rv){ const r=nx.r, late=daysBetween(r.due,today())>RV_GRACE;
       if(st==='eval') return {kind:late?'late':'act', lab:'目前待辦', tx:`請完成${s.label}${r.label}面談與評核（${r.due} 已開放${late?`，已超過 ${RV_GRACE} 天`:''}），並完成雙方簽名。`, b:['t','flag',`進入${s.label}評核`]};
       return {kind:'idle', lab:'目前無待辦', tx:`${s.label}的${r.label}評核將於 ${r.due} 自動開放，屆時請與受評人員面談並完成評核。`, b:['o','file','查看職務計畫']}; }
@@ -2589,7 +2668,7 @@ var MgrHome; MgrHome = {
       <div class="hd">${ic(x.ic,16)}<span>${title}</span></div><span class="tg">${x.t}</span><div class="d">${esc(x.d)}</div></div>`;
     el.innerHTML=L.map(c=>{ const T=this.todo(c), pr=this.period(c);
       const cards=[card('職務計畫書',this.planCard(c),'職務計畫書：填寫 → 面談 → 面談紀錄 → 雙方簽名')]
-        .concat(c.stages.map((s,i)=>card(s.label+(s.ext?'（延長）':''),this.stageCard(c,i),`${s.label}　${s.from} ～ ${s.to}　預計評核 ${s.due}`+((s.reviews||[]).length?`　追蹤評核：${s.reviews.map(r=>r.label+' '+r.due).join('、')}`:''))));
+        .concat(c.stages.flatMap((s,i)=>(rvFormal(c)?(s.reviews||[]).map((r,k)=>card(r.label,this.rvCard(c,i,k),`${r.label}　預計評核 ${r.due}`)):[]).concat([card(s.label+(s.ext?'（延長）':''),this.stageCard(c,i),`${s.label}　${s.from} ～ ${s.to}　預計評核 ${s.due}`+((s.reviews||[]).length?`　追蹤評核：${s.reviews.map(r=>r.label+' '+r.due).join('、')}`:''))])));
       const cls=T.kind==='late'?'late':T.kind==='act'?'act':caseState(c)==='done'?'fin':'';
       return `<div class="prow ${cls}">
         <div class="pr-grid">
@@ -2613,12 +2692,13 @@ var MgrHome; MgrHome = {
 var Manager; Manager = {
   id:'', token:'', c:null, sigs:{}, dirtySigs:{}, tab:'plan', dirty:false,
   STEPS: ['第一階段計畫','第二階段計畫','第三階段計畫','面談紀錄與員工回饋','確認與簽核'],
+  steps(){ return rvFormal(this.c) ? this.c.stages.slice(0,BASE_STAGES).map(s=>planLabel(this.c,s)).concat(this.STEPS.slice(BASE_STAGES)) : this.STEPS; },
   SIGN_STEP: 4,
   STEP_MONTHS: { '12m':['0-3個月','4-7個月','8-12個月'], '6m':['1-2個月','3-4個月','5-6個月'], '3m':['1個月','2個月','3個月'] },
   /* 階段計畫步驟標題顯示該人員實際的階段期間（依人資設定的生效日計算）；STEP_MONTHS 保留作為缺日期時的備用 */
   stepTitle(k){ const s=this.c.stages[k];
-    if(k<BASE_STAGES && s && s.from && s.to) return this.STEPS[k]+`（${md(s.from)}～${md(s.to)}）`;
-    const m=(this.STEP_MONTHS[this.c.version]||this.STEP_MONTHS['12m'])[k]; return this.STEPS[k]+(m?`（${m}）`:''); },
+    if(k<BASE_STAGES && s && s.from && s.to) return this.steps()[k]+`（${md(s.from)}～${md(s.to)}）`;
+    const m=(this.STEP_MONTHS[this.c.version]||this.STEP_MONTHS['12m'])[k]; return this.steps()[k]+(m?`（${m}）`:''); },
   progOpen: true,
   egsOpen: {tip:true, goal:false, content:false, outcome:false},
   step: 0, exKey: '', exStage: 0, focus:[0,0,0], editDim:-1,
@@ -2673,6 +2753,8 @@ var Manager; Manager = {
     const i=c.stages.findIndex(s=>!s.eval.locked);
     if(i<0) return canExtend(c) ? `${c.stages[c.stages.length-1].label}結論為延長觀察，待人資新增延長階段。` : '全部完成！可按右上角「列印／存 PDF」留存。';
     const nx=nextItem(c);
+    if(nx && nx.rv && rvFormal(c)) return rvOpen(c,nx.i,nx.k) ? `下一步：${nx.r.label}評核（預計 ${nx.r.due}），與受評人員面談並雙方簽名後送出`
+      : `職務計畫書已完成。${nx.r.label}評核預計於 ${nx.r.due} 進行，屆時由人資開啟後即可填寫。`;
     if(nx && nx.rv) return rvOpen(c,nx.i,nx.k) ? `下一步：${nx.s.label}｜${nx.r.label}評核（${nx.r.due} 已開放），與受評人員面談並雙方簽名後送出`
       : `職務計畫書已完成。${nx.s.label}的${nx.r.label}評核將於 ${nx.r.due} 自動開放，屆時即可填寫。`;
     if(this.extEditable(i)) return `下一步：訂定${c.stages[i].label}延長計畫（延長 ${c.stages[i].ext.months} 個月），與受評人員雙方簽名後送出`;
@@ -2692,13 +2774,14 @@ var Manager; Manager = {
       <span class="mt">${state.includes('done')?ic('checkc'):'<span class="mdot"></span>'}${t}</span><span class="ms">${sub}</span></button>`;
     const planSub = c.plan.locked ? '已簽核 '+c.plan.lockedAt : ([0,1,2,3,4].filter(k=>this.stepDone(k)).length+'／5 步驟完成');
     const rvMile=(s,i,r,k)=>{ const st=rvStatus(c,i,k), op=rvOpen(c,i,k);
-      return mile(r.label,'r'+i+k, r.eval.locked?'done':op?(st.k==='r'?'prog late':'prog'):(rvReady(c,i,k)?'wait':''),
-        r.eval.locked ? '已完成 '+r.eval.lockedAt+(r.eval.paper?'（紙本）':'') : op ? '填寫中｜'+r.due+' 已開放' : r.due+' 自動開放', !(r.eval.locked||op)); };
+      const fm=rvFormal(c);
+      return mile(r.label+(fm?'評核':''),'r'+i+k, r.eval.locked?'done':op?(st.k==='r'?'prog late':'prog'):(rvReady(c,i,k)?'wait':''),
+        r.eval.locked ? '已完成 '+r.eval.lockedAt+(r.eval.paper?'（紙本）':'') : op ? (fm?'評核中｜'+st.t:'填寫中｜'+r.due+' 已開放') : (fm?'待人資開啟｜預計 '+r.due:r.due+' 自動開放'), !(r.eval.locked||op)); };
     const miles = mile('職務計畫書','plan',c.plan.locked?'done':'prog',planSub,false) +
       c.stages.map((s,i)=>(s.reviews||[]).map((r,k)=>rvMile(s,i,r,k)).join('') + (()=>{ const st=stageStatus(c,i), xe=this.extEditable(i), xw=s.ext && s.ext.plan.locked && !s.eval.locked, open=this.canOpen(i)||s.eval.locked||xe||xw;
         const rvPend=(s.reviews||[]).some(r=>!r.eval.locked);
         const state = s.eval.locked?'done':(this.canOpen(i)||xe?(st.k==='r'?'prog late':'prog'):(c.plan.locked && (i===0||c.stages[i-1].eval.locked) && !rvPend?'wait':''));
-        const sub = s.eval.locked ? '已完成 '+s.eval.lockedAt+(s.eval.paper?'（紙本）':'') : xe ? '待訂延長計畫｜'+s.from+' 起' : this.canOpen(i) ? '評核中｜'+st.t : rvPend ? '須先完成追蹤評核｜預計 '+s.due : '待人資開啟｜預計評核日 '+s.due;
+        const sub = s.eval.locked ? '已完成 '+s.eval.lockedAt+(s.eval.paper?'（紙本）':'') : xe ? '待訂延長計畫｜'+s.from+' 起' : this.canOpen(i) ? '評核中｜'+st.t : rvPend ? '須先完成'+(rvFormal(c)?'前面的評核':'追蹤評核')+'｜預計 '+s.due : '待人資開啟｜預計評核日 '+s.due;
         return mile(s.label+(s.ext?'（延長）':'')+'評核',i,state, sub, !open); })()).join('');
     $('#app').innerHTML = `
     <div class="crumb"><button class="btn o s" id="backList">${ic('left')}返回人員列表</button><span class="mut">人員培育與職務追蹤平台 ／ ${esc(c.name)}</span></div>
@@ -2749,14 +2832,14 @@ var Manager; Manager = {
       const m=/^stages\.(\d)\.items\.(\d+)\./.exec(b), dm=/^stages\.(\d)\.dims\.(\d+)$/.exec(b);
       if(dm) this.onDimName(+dm[1], +dm[2], el);
       if(m||dm){ const i=+(m||dm)[1], j=+(m||dm)[2]; this.refreshCard(i,j); this.refreshDimProg(i); }
-    } else if(isRvPart(this.tab)){ this.refreshRvProg(this.tab); const nr=$('#noteReq'); if(nr) nr.style.display=rvOf(this.c,this.tab).eval.result===RV_RESULTS[1]?'':'none';
+    } else if(isRvPart(this.tab)){ this.refreshRvProg(this.tab); const nr=$('#noteReq'); if(nr){ const rs=rvOf(this.c,this.tab).eval.result; nr.style.display=rs && rs!==rvResults(this.c)[0]?'':'none'; }
     } else if(typeof this.tab==='number'){ this.refreshEvalProg(this.tab); const xb=$('#extBox'); if(xb){ xb.style.display=this.c.stages[this.tab].eval.conclusion==='延長觀察'?'':'none'; if(/eval\.conclusion$/.test(b)){ this.bindXPlan(this.tab); autoGrow(xb); } } const nr=$('#noteReq'); if(nr) nr.style.display=(this.c.stages[this.tab].eval.conclusion&&this.c.stages[this.tab].eval.conclusion!=='通過')?'':'none'; }
   },
   /* ---------- 職務計畫書 ---------- */
   ex(){ if(!this.exKey){ const e=EXAMPLES.find(x=>x.type===this.c.type)||EXAMPLES[0]; this.exKey=e.key; } return EXAMPLES.find(x=>x.key===this.exKey); },
   stepperHTML(){
     const st=this.step, txt={done:ic('check',13)+'已完成',prog:'填寫中','':'尚未開始'};
-    return this.STEPS.map((t,k)=>{ const s=this.stepState(k); return `<button class="stp ${s} ${k===st?'cur':''}" data-step="${k}"><span class="stp-no">STEP ${p2(k+1)}</span><span class="stp-t">${this.stepTitle(k)}</span><span class="stp-s">${txt[s]}</span></button>`; }).join('');
+    return this.steps().map((t,k)=>{ const s=this.stepState(k); return `<button class="stp ${s} ${k===st?'cur':''}" data-step="${k}"><span class="stp-no">STEP ${p2(k+1)}</span><span class="stp-t">${this.stepTitle(k)}</span><span class="stp-s">${txt[s]}</span></button>`; }).join('');
   },
   refreshStepper(){ this.refreshTop(); const s=$('.stepper'); if(!s) return; s.innerHTML=this.stepperHTML(); this.bindStepper(); },
   bindStepper(){ document.querySelectorAll('.stp').forEach(b=>b.onclick=()=>this.goStep(Number(b.dataset.step))); },
@@ -2865,14 +2948,14 @@ var Manager; Manager = {
   planMissing(withSign, withIv){
     const c=this.c, L=[];
     c.stages.forEach((s,i)=>{
-      if(!s.goal.trim()) L.push({m:`${s.label}：階段目標未填寫`,step:i});
-      if(s.dims.length<MIN_DIMS) L.push({m:`${s.label}：工作面向至少需要 ${MIN_DIMS} 個（目前 ${s.dims.length} 個）`,step:i,dimset:1});
-      if(s.dims.length>MAX_DIMS) L.push({m:`${s.label}：工作面向最多 ${MAX_DIMS} 個（目前 ${s.dims.length} 個），請刪除多餘的面向`,step:i,dimset:1});
-      s.dims.forEach((d,j)=>{ if(!String(d).trim()) L.push({m:`${s.label}：第 ${j+1} 個工作面向尚未命名`,step:i,dim:j,dimset:1}); });
+      if(!s.goal.trim()) L.push({m:`${planLabel(this.c,s)}：階段目標未填寫`,step:i});
+      if(s.dims.length<MIN_DIMS) L.push({m:`${planLabel(this.c,s)}：工作面向至少需要 ${MIN_DIMS} 個（目前 ${s.dims.length} 個）`,step:i,dimset:1});
+      if(s.dims.length>MAX_DIMS) L.push({m:`${planLabel(this.c,s)}：工作面向最多 ${MAX_DIMS} 個（目前 ${s.dims.length} 個），請刪除多餘的面向`,step:i,dimset:1});
+      s.dims.forEach((d,j)=>{ if(!String(d).trim()) L.push({m:`${planLabel(this.c,s)}：第 ${j+1} 個工作面向尚未命名`,step:i,dim:j,dimset:1}); });
       s.dims.forEach((d,j)=>{ const it=s.items[j], nm=d||('面向'+(j+1));
-        if(!it.content.trim()) L.push({m:`${s.label}｜${nm}：工作內容未填寫`,step:i,dim:j});
-        else if(contentCount(it.content)<MIN_CONTENT_ITEMS) L.push({m:`${s.label}｜${nm}：工作內容至少需要 ${MIN_CONTENT_ITEMS} 項（一行一項，目前 ${contentCount(it.content)} 項）`,step:i,dim:j});
-        if(!it.outcome.trim()) L.push({m:`${s.label}｜${nm}：預期成果未填寫`,step:i,dim:j}); });
+        if(!it.content.trim()) L.push({m:`${planLabel(this.c,s)}｜${nm}：工作內容未填寫`,step:i,dim:j});
+        else if(contentCount(it.content)<MIN_CONTENT_ITEMS) L.push({m:`${planLabel(this.c,s)}｜${nm}：工作內容至少需要 ${MIN_CONTENT_ITEMS} 項（一行一項，目前 ${contentCount(it.content)} 項）`,step:i,dim:j});
+        if(!it.outcome.trim()) L.push({m:`${planLabel(this.c,s)}｜${nm}：預期成果未填寫`,step:i,dim:j}); });
     });
     if(withSign || withIv) ivProblems(c.plan.interview).forEach(x=>L.push(Object.assign(x,{step:3})));
     if(withSign){
@@ -2909,14 +2992,14 @@ var Manager; Manager = {
       <div class="tip-tx">請從日常工作中歸納出 <b>${MIN_DIMS}～${MAX_DIMS} 個</b>主要工作面向，說明這個職務有哪些重要職責、需要完成哪些工作，以及應具備哪些專業能力。</div></details>`;
     const chipRow=`<div class="sub-hd">常用面向（點一下加入）</div><div class="chips" style="margin-bottom:16px">${chips.map(d=>`<button class="addchip" data-add="${esc(d)}" ${full?'disabled':''}>${ic('plus',13)}${esc(d)}</button>`).join('')}</div>`;
     return `<div class="card">
-      <div class="sec-hd"><div><div class="eyebrow">STEP ${p2(i+1)}｜${s.label}（${s.range}）</div><h2>${ic('layers')}${s.name}</h2>
+      <div class="sec-hd"><div><div class="eyebrow">STEP ${p2(i+1)}｜${planHead(this.c,s)}</div><h2>${ic('layers')}${s.name}</h2>
         <div class="mut row" style="gap:14px"><span>${ic('calendar',14)} ${s.from} ～ ${s.to}</span>${(s.reviews||[]).map(r=>`<span>${ic('clock',14)} ${r.label} ${r.due}</span>`).join('')}<span>${ic('clock',14)} 預計評核 ${s.due}</span></div></div>
         <button class="btn o" data-openex>${ic('book')}查看參考範例</button></div>
       <div class="f goalbox"><label class="lbl" for="goal${i}">${ic('target')}階段目標${REQ} <em>用一句話說明這個階段結束時要達到的狀態</em></label>
         ${this.egs('goal', es.goal)}
         <textarea id="goal${i}" data-bind="stages.${i}.goal" rows="2" placeholder="可參考上方範例，並依該職位實際狀況填寫">${esc(s.goal)}</textarea></div>
       <div class="dimset" id="dimset">
-      <div class="dimprog"><b>${ic('grid',16)}${s.label}工作面向${REQ}</b><div class="bar sm"><i id="dpBar"></i></div><span class="cnt" id="dpCnt"></span></div>
+      <div class="dimprog"><b>${ic('grid',16)}${planLabel(this.c,s)}工作面向${REQ}</b><div class="bar sm"><i id="dpBar"></i></div><span class="cnt" id="dpCnt"></span></div>
       ${tip}
       <div class="dimtabs" style="margin-top:12px">${D.map((d,j)=>`<button class="dimtab ${j===f?'cur':''} ${this.dimState(i,j)}" data-f="${j}" title="${esc(d)}"><span class="dno">${p2(j+1)}</span><span class="dt">${esc(d)||'（未命名）'}</span><span class="dot"></span></button>`).join('')}
         <button class="dimtab addtab" id="adddim" ${full?'disabled':''}>${ic('plus',15)}${full?`最多 ${MAX_DIMS} 個`:'新增面向'}</button></div>
@@ -2939,7 +3022,7 @@ var Manager; Manager = {
           ${f<n-1?`<button class="btn t" id="fnext">下一個面向：<span id="fnextName">${esc(D[f+1])||'未命名'}</span>${ic('right')}</button>`
                  :`<span class="mut" style="align-self:center">${ic('check',14)} 已是最後一個面向${n<MIN_DIMS?`，還需新增 ${MIN_DIMS-n} 個面向`:'，可按下方「下一步」'}</span>`}
         </div>
-      </div>`:`<div class="empty" style="padding:18px 0">${ic('grid',30)}<br>尚未設定${s.label}的工作面向，請按「新增面向」或從上方常用面向點選加入
+      </div>`:`<div class="empty" style="padding:18px 0">${ic('grid',30)}<br>尚未設定${planLabel(this.c,s)}的工作面向，請按「新增面向」或從上方常用面向點選加入
         ${i>0 && c.stages[i-1].dims.length?`<div style="margin-top:12px"><button class="btn o s" id="copyPrevDims">${ic('dup',14)}沿用${c.stages[i-1].label}的面向名稱</button></div>`:''}</div>`}
       </div>
     </div>
@@ -2994,7 +3077,7 @@ var Manager; Manager = {
     DIM_RECOMMEND.forEach(g=>{ const k=g.dims.filter(x=>D.includes(x.name)).length; if(k>bn){ bn=k; best=g.key; } }); return best; },
   stageHead(i){
     const s=this.c.stages[i], es=this.ex().stages[Math.min(i,2)];
-    return `<div class="sec-hd"><div><div class="eyebrow">${s.ext?`延長計畫｜${s.label}（${s.range}）`:`STEP ${p2(i+1)}｜${s.label}（${s.range}）`}</div><h2>${ic('layers')}${s.name}</h2>
+    return `<div class="sec-hd"><div><div class="eyebrow">${s.ext?`延長計畫｜${planHead(this.c,s)}`:`STEP ${p2(i+1)}｜${planHead(this.c,s)}`}</div><h2>${ic('layers')}${s.name}</h2>
         <div class="mut row" style="gap:14px"><span>${ic('calendar',14)} ${s.from} ～ ${s.to}</span>${(s.reviews||[]).map(r=>`<span>${ic('clock',14)} ${r.label} ${r.due}</span>`).join('')}<span>${ic('clock',14)} 預計評核 ${s.due}</span></div></div>
         <button class="btn o" data-openex>${ic('book')}查看參考範例</button></div>
       <div class="f goalbox"><label class="lbl" for="goal${i}">${ic('target')}階段目標${REQ} <em>用一句話說明這個階段結束時要達到的狀態</em></label>
@@ -3049,7 +3132,7 @@ var Manager; Manager = {
     return `<div class="card">
       ${this.stageHead(i)}
       <div class="dg" id="dimset">
-        <div class="dg-hd"><b>${ic('grid',16)}${s.label}工作面向${REQ}</b><div class="bar sm"><i id="dpBar"></i></div><span class="cnt" id="dpCnt"></span></div>
+        <div class="dg-hd"><b>${ic('grid',16)}${planLabel(this.c,s)}工作面向${REQ}</b><div class="bar sm"><i id="dpBar"></i></div><span class="cnt" id="dpCnt"></span></div>
         <p class="dg-sub">從日常工作中歸納 ${MIN_DIMS}～${MAX_DIMS} 個主要工作面向：先參考工作角色選擇面向，再逐一填寫工作內容與預期成果。</p>
         <div class="dgref">
           <div class="dr-sec"><div class="dr-t">1. 工作角色參考</div>
@@ -3214,7 +3297,7 @@ var Manager; Manager = {
       <div class="card"><h2>${ic('pen')}延長計畫確認與簽名</h2>${this.sigHTML(k,true)}<div class="mut" style="margin-top:10px">${ic('calendar',14)} 簽署日期：${s.ext.plan.signDate}</div></div>`;
   },
   stageSumHTML(s){
-    return `<div class="sumstage"><div class="hd"><span>${s.label}（${s.range}）：${s.name}</span><span>${s.from} ～ ${s.to}｜預計評核日 ${s.due}</span></div>
+    return `<div class="sumstage"><div class="hd"><span>${planHead(this.c,s)}：${s.name}</span><span>${s.from} ～ ${s.to}｜預計評核日 ${s.due}</span></div>
       <div class="bd"><div class="sumgoal"><b>目標：</b>${esc(s.goal)||'<span class="mut">（未填）</span>'}</div>
       <table class="sumtab"><tr><th style="width:22%">工作面向</th><th>工作內容</th><th style="width:34%">預期成果</th></tr>
       ${s.dims.map((d,j)=>`<tr><td><b>${esc(d)}</b></td><td>${esc(s.items[j].content)}</td><td>${esc(s.items[j].outcome)}</td></tr>`).join('')}</table></div></div>`;
@@ -3244,7 +3327,7 @@ var Manager; Manager = {
   },
   summaryHTML(){
     const c=this.c;
-    return c.stages.slice(0,BASE_STAGES).map(s=>`<div class="sumstage"><div class="hd"><span>${s.label}（${s.range}）：${s.name}</span><span>${s.from} ～ ${s.to}｜${(s.reviews||[]).map(r=>`${r.label} ${r.due}｜`).join('')}預計評核日 ${s.due}</span></div>
+    return c.stages.slice(0,BASE_STAGES).map(s=>`<div class="sumstage"><div class="hd"><span>${planHead(c,s)}：${s.name}</span><span>${s.from} ～ ${s.to}｜${(s.reviews||[]).map(r=>`${r.label}${rvFormal(c)?'評核':''} ${r.due}｜`).join('')}預計評核日 ${s.due}</span></div>
       <div class="bd"><div class="sumgoal"><b>目標：</b>${esc(s.goal)||'<span class="mut">（未填）</span>'}</div>
       <table class="sumtab"><tr><th style="width:22%">工作面向</th><th>工作內容</th><th style="width:34%">預期成果</th></tr>
       ${s.dims.map((d,j)=>`<tr><td><b>${esc(d)}</b></td><td>${esc(s.items[j].content)}</td><td>${esc(s.items[j].outcome)}</td></tr>`).join('')}</table></div></div>`).join('');
@@ -3318,18 +3401,19 @@ var Manager; Manager = {
   },
   /* ---------- 追蹤評核（階段中間的月份；到預計日期自動開放、需雙方簽名，沒有通過／延長／不通過） ---------- */
   renderReview(p){
-    const c=this.c, i=Number(p[1]), k=Number(p[2]), s=c.stages[i], r=s.reviews[k], e=r.eval, L=e.locked, dis=L?'disabled':'';
-    const head=`<div class="card"><div class="sec-hd"><div><div class="eyebrow">${s.label}（${s.range}）｜第 ${r.month} 個月追蹤評核</div><h2>${ic('clock')}${r.label}評核</h2>
-        <div class="mut">${ic('calendar',14)} ${r.due} 開放｜依${s.label}的計畫內容確認目前進度</div></div></div>
+    const c=this.c, i=Number(p[1]), k=Number(p[2]), s=c.stages[i], r=s.reviews[k], e=r.eval, L=e.locked, dis=L?'disabled':'', fm=rvFormal(c), RR=rvResults(c);
+    const head=`<div class="card"><div class="sec-hd"><div><div class="eyebrow">${fm?planLabel(c,s):`${s.label}（${s.range}）`}｜第 ${r.month} 個月${rvKind(c)}</div><h2>${ic(fm?'flag':'clock')}${r.label}評核</h2>
+        <div class="mut">${ic('calendar',14)} ${fm?'預計評核日 '+r.due:r.due+' 開放'}｜依${s.label}的計畫內容確認目前進度</div></div></div>
       <div class="sumgoal"><b>階段目標：</b>${esc(s.goal)}</div>
       <details class="std"><summary>${ic('info',14)} 查看評分標準</summary>${this.stdTable()}</details></div>`;
     if(L && e.paper){
       $('#body').innerHTML=`<div class="banner g">${ic('lock')}<span>${r.label}評核已於 <b>${e.lockedAt}</b> 以<b>紙本</b>完成，正本存人資部。</span></div>${head}`; return; }
     if(!L && !rvOpen(c,i,k)){
-      $('#body').innerHTML=`<div class="banner b">${ic('info')}<span>${s.label}的${r.label}評核將於 <b>${r.due}</b> 自動開放，屆時即可填寫。</span></div>${head}${this.stageSumHTML(s)}`; return; }
-    const late=daysBetween(r.due,today())>RV_GRACE, def=x=>(STANDARD.find(y=>y[0]===x)||['',''])[1], rIcon=['xc','minus','check'], B=`stages.${i}.reviews.${k}.eval`;
+      $('#body').innerHTML=`<div class="banner b">${ic('info')}<span>${fm?`${r.label}評核預計於 <b>${r.due}</b> 進行，由人資開啟後即可填寫。`:`${s.label}的${r.label}評核將於 <b>${r.due}</b> 自動開放，屆時即可填寫。`}</span></div>${head}${this.stageSumHTML(s)}`; return; }
+    const late=fm ? daysBetween(r.due,today())>0 : daysBetween(r.due,today())>RV_GRACE, def=x=>(STANDARD.find(y=>y[0]===x)||['',''])[1], rIcon=['xc','minus','check'], B=`stages.${i}.reviews.${k}.eval`;
     $('#body').innerHTML = `
     ${L?`<div class="banner g">${ic('lock')}<span>${r.label}評核已於 <b>${e.lockedAt}</b> 完成面談簽核並鎖定。如需修改，請洽人資部解鎖。</span></div>`
+       :fm?`<div class="banner ${late?'a':'b'}">${ic(late?'warn':'info')}<span>人資已開啟${r.label}評核，期限 <b>${r.due}</b>${late?'（已逾期，請盡快完成）':''}。請依第${CN[i]}階段計畫逐項評核，與受評人員面談並雙方簽名。</span></div>`
        :`<div class="banner ${late?'a':'b'}">${ic(late?'warn':'info')}<span>${r.label}評核已於 <b>${r.due}</b> 開放${late?`（已超過 ${RV_GRACE} 天，請盡快完成）`:''}。請依第${CN[i]}階段計畫逐項確認目前進度，與受評人員面談並雙方簽名。</span></div>`}
     ${head}
     <div class="card" style="padding:14px 22px"><div class="dimprog" style="margin:0"><b>評核進度</b><div class="bar sm"><i id="evBar"></i></div><span class="cnt" id="evCnt"></span></div></div>
@@ -3345,12 +3429,12 @@ var Manager; Manager = {
     <div class="card" id="evFb"><h2>${ic('chat')}面談紀錄${L?'':REQ}</h2>
       <label class="f"><span>本次面談內容及受評人員的回饋 <em>由面談主管於面談時記錄</em></span>
         <textarea class="autogrow" data-bind="${B}.feedback" rows="3" placeholder="${L?'':'例：說明本月表現與下個月的重點；受評人員希望多參與現場會議'}" ${dis}>${esc(e.feedback)}</textarea></label></div>
-    <div class="card" id="evConc"><h2>${ic('flag')}追蹤結果${L?'':REQ}</h2>
-      <div class="opts o2c">${RV_RESULTS.map((x,q)=>{ const o=[2,1][q]; return `<label class="opt o${o} ${e.result===x?'sel':''}"><input type="radio" name="rvres" value="${x}" data-bind="${B}.result" ${e.result===x?'checked':''} ${dis}>
-        <span class="oi">${ic(rIcon[o],18)}</span><span class="ot">${x}</span><span class="od">${['依計畫持續進行','安排具體輔導，下次評核追蹤改善情形'][q]}</span></label>`; }).join('')}</div>
-      <label class="f" style="margin-top:14px"><span>說明／輔導安排${L?'':`<span class="req" id="noteReq" style="${e.result===RV_RESULTS[1]?'':'display:none'}">*</span>`} <em>「${RV_RESULTS[1]}」時必填</em></span><textarea class="autogrow" data-bind="${B}.note" rows="3" ${dis}>${esc(e.note)}</textarea></label>
+    <div class="card" id="evConc"><h2>${ic('flag')}${fm?'評核結論':'追蹤結果'}${L?'':REQ}</h2>
+      <div class="opts ${fm?'':'o2c'}">${RR.map((x,q)=>{ const o=fm?[2,1,0][q]:[2,1][q]; return `<label class="opt o${o} ${e.result===x?'sel':''}"><input type="radio" name="rvres" value="${x}" data-bind="${B}.result" ${e.result===x?'checked':''} ${dis}>
+        <span class="oi">${ic(rIcon[o],18)}</span><span class="ot">${x}</span><span class="od">${(fm?['本次評核達到預期，依計畫繼續進行','需延長觀察，請在說明中寫明改善重點','未達到本次評核要求，請在說明中寫明原因']:['依計畫持續進行','安排具體輔導，下次評核追蹤改善情形'])[q]}</span></label>`; }).join('')}</div>
+      <label class="f" style="margin-top:14px"><span>${fm?'結論說明':'說明／輔導安排'}${L?'':`<span class="req" id="noteReq" style="${e.result && e.result!==RR[0]?'':'display:none'}">*</span>`} <em>${fm?'選「延長觀察」或「不通過」時必填':`「${RV_RESULTS[1]}」時必填`}</em></span><textarea class="autogrow" data-bind="${B}.note" rows="3" ${dis}>${esc(e.note)}</textarea></label>
       <div class="mut" style="margin-top:6px">${ic('calendar',13)} 評核（簽署）日期：${L?(e.date||e.lockedAt):'雙方簽名後送出當日，系統自動記錄'}</div>
-      <div class="mut" style="margin-top:4px">${ic('info',13)} 追蹤評核只記錄進度與輔導安排，不決定通過與否；${s.label}的結論於階段評核時決定。</div></div>
+      <div class="mut" style="margin-top:4px">${ic('info',13)} ${fm?'選「延長觀察」或「不通過」不會建立延長階段，之後的評核照常進行；延長觀察期間只在第三階段評核後適用。':`追蹤評核只記錄進度與輔導安排，不決定通過與否；${s.label}的結論於階段評核時決定。`}</div></div>
     <div class="card" id="evSig"><h2>${ic('pen')}面談確認與簽名</h2>${this.sigHTML(p,L)}</div>
     ${L?'':`<div class="stickybar"><span class="mut" id="evHint"></span><span class="sp"></span><button class="btn o" id="save">${ic('save')}儲存草稿</button><button class="btn t" id="lock">${ic('eye')}預覽並送出</button></div>`}`;
     this.bindInputs(); this.initPads(p,L); this.refreshRvProg(p); autoGrow($('#body'));
@@ -3368,16 +3452,16 @@ var Manager; Manager = {
     if(!this.sigs[a]) L.push({m:'面談主管尚未簽名',anchor:'evSig'});
     if(!this.sigs[b]) L.push({m:'受評人員尚未簽名',anchor:'evSig'});
     if(L.length) return Dialog.missing(L,x=>this.goMissing(x));
-    const chip=x=>`<span class="chip ${x==='表現優異'||x===RV_RESULTS[0]?'g':x==='表現尚可'?'a':'r'}">${x}</span>`;
+    const chip=x=>`<span class="chip ${x==='表現優異'||x===RV_RESULTS[0]||x==='通過'?'g':x==='表現尚可'||x==='延長觀察'?'a':'r'}">${x}</span>`, fm=rvFormal(c);
     Modal.open(`<div class="dlg-hd"><span class="dlg-ic">${ic('eye',20)}</span><h2>預覽｜${r.label}評核（${esc(c.name)}）</h2></div>
       <div class="dlg-bd">
         <table class="pvtab"><tr><th style="width:28%">工作面向</th><th style="width:16%">目前表現</th><th>本月觀察</th></tr>
           ${s.dims.map((d,j)=>`<tr><td><b>${esc(d)}</b></td><td>${chip(e.ratings[j])}</td><td class="pre">${esc(e.comments[j])||'<span class="mut">—</span>'}</td></tr>`).join('')}</table>
         <table class="pvtab"><tr><th style="width:28%">面談紀錄</th><td class="pre">${esc(e.feedback)}</td></tr>
-          <tr><th>追蹤結果</th><td>${chip(e.result)}</td></tr><tr><th>說明／輔導安排</th><td class="pre">${esc(e.note)||'—'}</td></tr>
+          <tr><th>${fm?'評核結論':'追蹤結果'}</th><td>${chip(e.result)}</td></tr><tr><th>${fm?'結論說明':'說明／輔導安排'}</th><td class="pre">${esc(e.note)||'—'}</td></tr>
           <tr><th>評核（簽署）日期</th><td>${today()}（送出當日自動記錄）</td></tr></table>
         <div class="pvsig"><div><img src="${this.sigs[a]}" alt="">面談主管簽名</div><div><img src="${this.sigs[b]}" alt="">受評人員簽名</div></div>
-        <div class="warn" style="margin-top:14px">${ic('lock')}<span>送出後此追蹤評核表將<b>鎖定</b>，如需修改須由人資解鎖。</span></div></div>
+        <div class="warn" style="margin-top:14px">${ic('lock')}<span>送出後此${fm?'':'追蹤'}評核表將<b>鎖定</b>，如需修改須由人資解鎖。</span></div></div>
       <div class="dlg-ft"><button class="btn o" data-close>${ic('left')}返回修改</button><button class="btn t" id="pvOk">${ic('send')}確認送出並鎖定</button></div>`,{wide:true});
     $('#pvOk').onclick=()=>{ Modal.close(); this.save(p); };
   },
@@ -3569,7 +3653,7 @@ var Printer; Printer = {
       `<tr><th>計畫期間</th><td colspan="3">${roc(s0.from)} ～ ${roc(s2.to)}</td><th>評核次數</th><td>${c.version==='12m'?CADENCES[cadOf(c)].name:'3 次'}</td></tr>
        <tr><th>預計評核日期</th><td colspan="5">${timeline(c).filter(x=>x.i<BASE_STAGES).map(x=>x.rv?`${x.r.label} ${roc(x.r.due)}`:`${x.s.label} ${roc(x.s.due)}`).join('、')}</td></tr>`,'plan')}
     <div class="sec">一、各階段工作計畫</div>
-    ${c.stages.slice(0,BASE_STAGES).map(s=>`<div class="sbar"><span>${s.label}（${s.range}）｜${s.name}</span><span>${roc(s.from)} ～ ${roc(s.to)}・${(s.reviews||[]).map(r=>`${r.label} ${roc(r.due)}・`).join('')}預計評核日 ${roc(s.due)}</span></div>
+    ${c.stages.slice(0,BASE_STAGES).map(s=>`<div class="sbar"><span>${planHead(c,s)}｜${s.name}</span><span>${roc(s.from)} ～ ${roc(s.to)}・${(s.reviews||[]).map(r=>`${r.label} ${roc(r.due)}・`).join('')}預計評核日 ${roc(s.due)}</span></div>
       <div class="goal"><b>階段目標：</b><span class="pre">${esc(s.goal)}</span></div>
       <table><thead><tr><th style="width:19%">工作面向</th><th style="width:46%">工作內容</th><th>預期成果</th></tr></thead>
       ${s.dims.map((d,j)=>`<tr><td><b>${esc(d)}</b></td><td class="pre">${esc(s.items[j].content)}</td><td class="pre">${esc(s.items[j].outcome)}</td></tr>`).join('')}</table>`).join('')}
@@ -3609,10 +3693,10 @@ var Printer; Printer = {
   },
   /* 追蹤評核表 */
   rvPage(c,sigs,p){
-    const i=Number(p[1]), s=c.stages[i], r=rvOf(c,p), e=r.eval;
+    const i=Number(p[1]), s=c.stages[i], r=rvOf(c,p), e=r.eval, fm=rvFormal(c);
     const tally=RATINGS.slice().reverse().map(x=>`${x} ${e.ratings.filter(y=>y===x).length} 項`).join('・');
-    return `<div class="pp">${this.head(c,s.label+'｜'+r.label+'評核表',this.status(e.locked,e.lockedAt),
-      `<tr><th>評核項目</th><td colspan="3">${s.label}（${s.range}）｜第 ${r.month} 個月追蹤評核・階段期間 ${roc(s.from)} ～ ${roc(s.to)}</td><th>評核日期</th><td>${roc(e.date||e.lockedAt)}</td></tr>`,p)}
+    return `<div class="pp">${this.head(c,(fm?'':s.label+'｜')+r.label+'評核表',this.status(e.locked,e.lockedAt),
+      `<tr><th>評核項目</th><td colspan="3">${fm?planLabel(c,s):`${s.label}（${s.range}）`}｜第 ${r.month} 個月${rvKind(c)}・${fm?'計畫':'階段'}期間 ${roc(s.from)} ～ ${roc(s.to)}</td><th>評核日期</th><td>${roc(e.date||e.lockedAt)}</td></tr>`,p)}
     <div class="sec">一、階段目標</div>
     <table><tr><td class="pre">${esc(s.goal)}</td></tr></table>
     <div class="sec">二、目前表現</div>
@@ -3625,11 +3709,11 @@ var Printer; Printer = {
     <div class="tally">統計：${tally}</div>
     <div class="sec">三、面談紀錄</div>
     <table><tr><td class="pre">${esc(e.feedback)||'—'}</td></tr></table>
-    <div class="sec">四、追蹤結果</div>
-    <table><tr><th style="width:15%">結果</th><td class="cc">${RV_RESULTS.map(x=>`<span class="${e.result===x?'on':''}">${e.result===x?'■':'□'} ${x}</span>`).join('')}</td></tr>
-      <tr><th>說明／輔導安排</th><td class="pre">${esc(e.note)||'—'}</td></tr></table>
+    <div class="sec">四、${fm?'評核結論':'追蹤結果'}</div>
+    <table><tr><th style="width:15%">${fm?'結論':'結果'}</th><td class="cc">${rvResults(c).map(x=>`<span class="${e.result===x?'on':''}">${e.result===x?'■':'□'} ${x}</span>`).join('')}</td></tr>
+      <tr><th>${fm?'結論說明':'說明／輔導安排'}</th><td class="pre">${esc(e.note)||'—'}</td></tr></table>
     <div class="keep"><div class="sec">五、面談確認</div>
-    <div class="stmt">本追蹤評核已由面談主管與受評人員完成面談，雙方確認目前進度與後續輔導安排。</div>
+    <div class="stmt">${fm?'本評核已由面談主管與受評人員完成面談，雙方確認評核結果與結論。':'本追蹤評核已由面談主管與受評人員完成面談，雙方確認目前進度與後續輔導安排。'}</div>
     ${this.sigRow(sigs,SIGKEYS(p),c,e.date||e.lockedAt,p)}</div>
     ${this.foot(c,s.label+r.label+'評核表')}</div>`;
   },
@@ -3680,13 +3764,70 @@ var Printer; Printer = {
     else if(isExtPart(part)) h+=this.extPage(c,sigs,Number(part.slice(1)));
     else if(typeof part==='number' && c.stages[part].eval.locked) h+=this.evalPage(c,sigs,part);
     $('#printArea').innerHTML=h;
-    const old=document.title; document.title=c.name+'_'+c.type+'_職務計畫'+(typeof part==='number'?'_'+c.stages[part].label+'評核':isRvPart(part)?'_'+c.stages[Number(part[1])].label+rvOf(c,part).label+'評核':isExtPart(part)?'_'+c.stages[Number(part.slice(1))].label+'延長計畫':'');
+    const old=document.title; document.title=c.name+'_'+c.type+'_職務計畫'+(typeof part==='number'?'_'+c.stages[part].label+'評核':isRvPart(part)?'_'+(rvFormal(c)?'':c.stages[Number(part[1])].label)+rvOf(c,part).label+'評核':isExtPart(part)?'_'+c.stages[Number(part.slice(1))].label+'延長計畫':'');
     setTimeout(()=>{ try{ window.print(); }catch(e){ toast('此環境無法開啟列印，請改用部署後的網址'); } document.title=old; },150);
   }
 };
 
+/* ---------------- whoseTurn 測試（只在示範模式、網址加 ?test=whoseTurn 時執行；不讀寫任何資料） ---------------- */
+const WhoseTurnTest = {
+  base(o){ o=o||{};
+    const c=buildCaseBase(Object.assign({type:'新進',version:'12m',cadence:'std',name:'測試',dept:'',title:'',manager:'測試主管',managerId:'M1',startDate:fmt(addM(new Date(),-2)),dims:[]},o));
+    c.stages.forEach(s=>{ s.dims=['甲','乙','丙']; s.items=s.dims.map(()=>({content:'1. a\n2. b',outcome:'x'})); s.eval.ratings=['','','']; s.eval.comments=['','','']; s.eval.checks=[[],[],[]];
+      s.reviews.forEach(r=>{ r.eval.ratings=['','','']; r.eval.comments=['','','']; }); });
+    return normCase(c); },
+  lockPlan(c){ Object.assign(c.plan,{locked:true,lockedAt:today(),signDate:today()}); return c; },
+  done(s,conc){ s.reviews.forEach(r=>Object.assign(r.eval,{locked:true,lockedAt:today()})); Object.assign(s.eval,{locked:true,lockedAt:today(),open:true,conclusion:conc||'通過'}); },
+  dueIn(s,d){ s.due=fmt(addD(new Date(),d)); },
+  cases(){
+    const T=[], add=(name,c,who,reason,mgr)=>T.push({name,c,who,reason,mgr,hasMgr:arguments.length>4});
+    const P=()=>this.lockPlan(this.base());
+    let c;
+    add('沒有負責主管', this.base({managerId:''}), 'hr','尚未指派主管');
+    c=P(); c.stages.forEach(s=>this.done(s)); add('全部階段已完成', c, 'done','已完成簽核');
+    add('計畫書未簽核（未填）', this.base(), 'mgr','計畫書填寫／面談／簽名中');
+    c=this.base(); c.stages[0].goal='目標'; add('計畫書未簽核（填寫中）', c, 'mgr','計畫書填寫／面談／簽名中');
+    c=this.lockPlan(this.base({cadence:'hh5'})); c.stages[0].reviews[0].due=fmt(addD(new Date(),5)); add('追蹤評核尚未到開放日', c, 'none','等待自動開放（人資不用動作）');
+    c=this.lockPlan(this.base({cadence:'hh5'})); c.stages[0].reviews[0].due=today(); add('追蹤評核今天開放', c, 'mgr','追蹤評核填寫中');
+    c=this.lockPlan(this.base({cadence:'mgr5'})); this.done(c.stages[0]); c.stages[1].reviews[0].due=fmt(addD(new Date(),-30)); add('第二階段追蹤評核已開放（逾期）', c, 'mgr','追蹤評核填寫中');
+    c=P(); [0,1].forEach(i=>this.done(c.stages[i])); this.done(c.stages[2],'延長觀察'); c.stages[2].eval.extMonths=2; addExtStage(c,2,2); c.stages[3].ext.plan.locked=false; c.stages[3].ext.auto=false;
+      add('延長階段，延長計畫未簽核（舊資料）', c, 'mgr','主管訂定延長計畫中');
+    c=P(); c.stages[0].eval.open=true; add('階段評核已開啟、未完成', c, 'mgr','階段評核填寫中');
+    c=P(); this.dueIn(c.stages[0],14); add('未開啟，距今 14 天', c, 'hr','該開啟評核了');
+    c=P(); this.dueIn(c.stages[0],0); add('未開啟，今天到期', c, 'hr','該開啟評核了');
+    c=P(); this.dueIn(c.stages[0],-10); add('未開啟，已逾期 10 天', c, 'hr','該開啟評核了');
+    c=P(); this.dueIn(c.stages[0],15); add('未開啟，距今 15 天', c, 'none','尚未到時間');
+    c=this.lockPlan(this.base({cadence:'hh5'})); this.done(c.stages[0]); this.dueIn(c.stages[1],3); add('追蹤評核完成後，第二階段即將到期', c, 'hr','該開啟評核了');
+    c=P(); [0,1].forEach(i=>this.done(c.stages[i])); this.done(c.stages[2],'延長觀察'); c.stages[2].eval.extMonths=1; addExtStage(c,2,1); this.dueIn(c.stages[3],7);
+      add('延長階段（自動建立）即將到期', c, 'hr','該開啟評核了');
+    c=P(); c.stages.forEach(s=>this.done(s)); c.stages[2].eval.conclusion='延長觀察'; add('canExtend（舊資料：結論延長觀察但無延長階段）', c, 'hr','可新增延長階段');
+    c=P(); c.plan.paper=true; this.done(c.stages[0]); c.stages[0].eval.paper=true; this.dueIn(c.stages[1],60); add('紙本匯入：第一階段紙本完成', c, 'none','尚未到時間');
+    c=P(); this.done(c.stages[0],'不通過'); this.dueIn(c.stages[1],5); add('第一階段不通過，照樣進到下一階段', c, 'hr','該開啟評核了');
+    c=this.lockPlan(this.base({cadence:'f5'})); c.stages[0].reviews[0].due=fmt(addD(new Date(),5)); add('5次評核：第1月評核 5 天後到期、未開啟', c, 'hr','該開啟評核了');
+    c=this.lockPlan(this.base({cadence:'f5'})); c.stages[0].reviews[0].due=fmt(addD(new Date(),30)); add('5次評核：第1月評核 30 天後到期', c, 'none','尚未到時間');
+    c=this.lockPlan(this.base({cadence:'f5'})); c.stages[0].reviews[0].due=fmt(addD(new Date(),-3)); c.stages[0].reviews[0].eval.open=true; add('5次評核：第1月評核已開啟', c, 'mgr','評核填寫中');
+    c=this.lockPlan(this.base({cadence:'f5'})); c.stages[0].reviews[0].due=fmt(addD(new Date(),-3)); add('5次評核：已過預計日但人資未開啟（不會自動開放）', c, 'hr','該開啟評核了');
+    c=this.lockPlan(this.base({cadence:'f5'})); Object.assign(c.stages[0].reviews[0].eval,{locked:true,result:'不通過'}); c.stages[0].reviews[1].due=fmt(addD(new Date(),2)); add('5次評核：第1月不通過，照樣進到第2月', c, 'hr','該開啟評核了');
+    T.push({name:'人資端：主管清單找不到（傳入 null）', c:P(), who:'hr', reason:'尚未指派主管', mgr:null, hasMgr:true});
+    T.push({name:'人資端：主管連結已撤銷（待確認）', c:P(), who:'hr', reason:'主管連結已撤銷', mgr:{tokenStatus:'revoked'}, hasMgr:true});
+    c=P(); this.dueIn(c.stages[0],60); T.push({name:'人資端：主管連結有效', c, who:'none', reason:'尚未到時間', mgr:{tokenStatus:'active'}, hasMgr:true});
+    return T;
+  },
+  run(){
+    const R=this.cases().map(t=>{ let r, err=''; try{ r=t.hasMgr ? whoseTurn(t.c,t.mgr) : whoseTurn(t.c); }catch(e){ err=e.message; }
+      return Object.assign(t,{r,err,ok:!err && r.who===t.who && r.reason===t.reason}); });
+    const bad=R.filter(x=>!x.ok).length;
+    console.log('[whoseTurn] '+(R.length-bad)+'/'+R.length+' 通過');
+    $('#app').innerHTML=`<div class="card"><h2>whoseTurn 測試：${R.length-bad} / ${R.length} 通過${bad?`（${bad} 項失敗）`:''}</h2>
+      <div style="overflow-x:auto"><table class="list"><thead><tr><th>結果</th><th>情境</th><th>預期</th><th>實際</th></tr></thead><tbody>
+      ${R.map(x=>`<tr><td>${x.ok?'✅ 通過':'❌ 失敗'}</td><td>${esc(x.name)}</td><td>${x.who}｜${esc(x.reason)}</td><td>${x.err?'錯誤：'+esc(x.err):x.r.who+'｜'+esc(x.r.reason)}</td></tr>`).join('')}
+      </tbody></table></div><p class="mut">這個測試只在示範模式執行，不會讀寫任何資料。</p></div>`;
+    return {pass:R.length-bad, total:R.length};
+  }
+};
 /* ---------------- 啟動 ---------------- */
-if(Q.get('m')) MgrHome.init(Q.get('m'), Q.get('c'));
+if(DEMO && Q.get('test')==='whoseTurn') WhoseTurnTest.run();
+else if(Q.get('m')) MgrHome.init(Q.get('m'), Q.get('c'));
 else if(Q.get('c') && Q.get('k')){   // 舊版單一案件連結：已停用（後端同樣拒絕）
   $('#roleTxt').textContent='主管填寫端';
   $('#app').innerHTML=`<div class="card" style="max-width:520px;margin:60px auto"><div class="dlg-hd danger"><span class="dlg-ic">${ic('warn',20)}</span><h2 style="margin:0">此連結已停用</h2></div>系統已改為「一位主管一個專屬連結」，請洽人資部取得您的主管專屬連結。</div>`;
