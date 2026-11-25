@@ -2720,6 +2720,7 @@ var Manager; Manager = {
     else { let k=0; while(k<this.SIGN_STEP && this.stepDone(k)) k++; this.step=k; }
     this.focus=c.stages.map(s=>{ const j=s.items.findIndex(it=>!(it.content.trim()&&it.outcome.trim())); return j<0?0:j; });
     if(!this._bu){ this._bu=true; window.addEventListener('beforeunload',e=>{ if(this.active && this.dirty){ e.preventDefault(); e.returnValue=''; } }); }
+    if(!this._as){ this._as=setInterval(()=>this.autoSave(), AUTOSAVE_MS); }   // 每 5 分鐘自動儲存草稿（有修改才存）
     this.render();
   },
   /* 返回主管工作清單（有未儲存內容時先確認） */
@@ -3570,7 +3571,30 @@ var Manager; Manager = {
       const cv=document.createElement('canvas'); cv.dataset.sig=k; old.replaceWith(cv); SigPad(cv,done(k)); if(this.tab==='plan') this.refreshStepper(); });
     document.querySelectorAll('canvas[data-sig]').forEach(cv=>SigPad(cv,done(cv.dataset.sig)));
   },
+  /* 自動儲存：與「儲存草稿」相同（mgrSave，不帶 lockPart），只在有未儲存的修改、且沒有其他儲存進行中時執行。
+     儲存期間若主管仍在輸入，保留畫面上的新內容（不以伺服器回傳覆蓋），下一次再存 */
+  async autoSave(){
+    if(!this.active || !this.dirty || this._saving || $('#modal')) return;
+    const ok=await this.save(undefined,'auto');
+    if(ok){ const n=new Date(); toast(`已自動儲存（${p2(n.getHours())}:${p2(n.getMinutes())}）`,1800); }
+  },
   async save(lockPart,silent){
+    if(this._saving) return false; this._saving=true;
+    try{ return await this.save0(lockPart,silent); } finally{ this._saving=false; }
+  },
+  async save0(lockPart,silent){
+    if(silent==='auto'){   // 自動儲存：不鎖按鈕、不打斷輸入
+      const sent=JSON.stringify(this.c), sentSigs=Object.assign({},this.dirtySigs);
+      try{
+        const r=await api('mgrSave',{id:this.id,token:this.token,c:this.c,sigs:sentSigs});
+        const changed=JSON.stringify(this.c)!==sent;
+        if(!changed) this.c=r.c;
+        Object.keys(sentSigs).forEach(k=>{ if(this.dirtySigs[k]===sentSigs[k]) delete this.dirtySigs[k]; });
+        this.sigs=Object.assign({}, r.sigs||{}, this.dirtySigs);
+        this.dirty = changed || Object.keys(this.dirtySigs).length>0;
+        return true;
+      }catch(e){ toast('自動儲存失敗：'+e.message+'。請按「儲存草稿」再試一次',4200); return false; }
+    }
     const btns=document.querySelectorAll('.stickybar .btn'); btns.forEach(b=>b.disabled=true);
     try{
       if(lockPart!==undefined){ const err=validatePart(this.c,this.sigs,parsePart(lockPart)); if(err) throw new Error(err); }
@@ -3584,6 +3608,7 @@ var Manager; Manager = {
   }
 };
 
+const AUTOSAVE_MS = 5*60*1000;   // 主管填寫頁自動儲存間隔（5 分鐘）
 /* ---------------- 簽名板 ---------------- */
 function SigPad(cv,onDone){
   const ctx=cv.getContext('2d'); let drawing=false, last=null, has=false;
